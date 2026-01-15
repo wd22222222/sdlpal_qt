@@ -1,0 +1,186 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"jsonFile" : "directory-.-Debug-d0094a50bb2071803777.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.14"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4,
+						5,
+						6,
+						7,
+						8,
+						9,
+						10,
+						11,
+						12,
+						13,
+						14
+					]
+				}
+			],
+			"name" : "Debug",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "sdlpal_qt",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2,
+						3,
+						4,
+						5,
+						6,
+						7,
+						8,
+						9,
+						10,
+						11,
+						12,
+						13,
+						14
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "main_lib::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-main_lib-Debug-256171f3e4d6a32559e7.json",
+					"name" : "main_lib",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "main_lib_autogen::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-main_lib_autogen-Debug-83ab5a184c463945a9d1.json",
+					"name" : "main_lib_autogen",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "main_lib_autogen_timestamp_deps::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-main_lib_autogen_timestamp_deps-Debug-e2e0b3f047e4a55fafa6.json",
+					"name" : "main_lib_autogen_timestamp_deps",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "s_lib::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-s_lib-Debug-7299b315bccb34a5b816.json",
+					"name" : "s_lib",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "s_lib_autogen::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-s_lib_autogen-Debug-37066a47fc89373cb9b4.json",
+					"name" : "s_lib_autogen",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "s_lib_autogen_timestamp_deps::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-s_lib_autogen_timestamp_deps-Debug-6e9ea418620a2b00fe0f.json",
+					"name" : "s_lib_autogen_timestamp_deps",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "sdlpal::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-sdlpal-Debug-688ee282e78c27058261.json",
+					"name" : "sdlpal",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "sdlpal_autogen::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-sdlpal_autogen-Debug-4615619f478804cdc66e.json",
+					"name" : "sdlpal_autogen",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "sdlpal_autogen_timestamp_deps::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-sdlpal_autogen_timestamp_deps-Debug-4cd47d0a8b85a3183646.json",
+					"name" : "sdlpal_autogen_timestamp_deps",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "sdlpal_qt::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-sdlpal_qt-Debug-8ac2d57b3fad24ebe5fc.json",
+					"name" : "sdlpal_qt",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "sdlpal_qt_autogen::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-sdlpal_qt_autogen-Debug-13e286e61c89c86d7bfd.json",
+					"name" : "sdlpal_qt_autogen",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "sdlpal_qt_autogen_timestamp_deps::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-sdlpal_qt_autogen_timestamp_deps-Debug-4834cd10829a3ea27aa2.json",
+					"name" : "sdlpal_qt_autogen_timestamp_deps",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "sound_lib::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-sound_lib-Debug-25d892f23e0b4f5c2e9b.json",
+					"name" : "sound_lib",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "sound_lib_autogen::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-sound_lib_autogen-Debug-f922e1c222b602c3c133.json",
+					"name" : "sound_lib_autogen",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "sound_lib_autogen_timestamp_deps::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-sound_lib_autogen_timestamp_deps-Debug-b5177cb3e69ce1f81ea5.json",
+					"name" : "sound_lib_autogen_timestamp_deps",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "D:/qt/sdlpal_1/build/Desktop_Qt_5_15_2_MinGW_64_bit-Debug",
+		"source" : "D:/qt/sdlpal_1"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 7
+	}
+}

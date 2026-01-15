@@ -1,0 +1,294 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>17.0</VCProjectVersion>
+    <ProjectGuid>{14AC157F-961B-4A0A-A298-BDE95ED3EDC5}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+    <IntDir>$(SolutionDir)$(Platform)\$(Configuration)\s\</IntDir>
+    <IncludePath>D:\SDL2\include\SDL2;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>true</LinkIncremental>
+    <IntDir>$(SolutionDir)$(Platform)\$(Configuration)\s\</IntDir>
+    <IncludePath>D:\SDL2\include\SDL2;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Label="Vcpkg" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <VcpkgUseStatic>true</VcpkgUseStatic>
+  </PropertyGroup>
+  <PropertyGroup Label="Vcpkg" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <VcpkgUseStatic>true</VcpkgUseStatic>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <WarningLevel>Level3</WarningLevel>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Windows</SubSystem>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <PreprocessorDefinitions>USING_OGG;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <WarningLevel>Level3</WarningLevel>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Windows</SubSystem>
+      <AdditionalDependencies>winmm.lib;imm32.lib;setupapi.lib;Version.lib;sdl2maind.lib;comctl32.lib;rpcrt4.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <WarningLevel>Level3</WarningLevel>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <PreprocessorDefinitions>USING_OGG;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <WarningLevel>Level3</WarningLevel>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalDependencies>winmm.lib;imm32.lib;setupapi.lib;Version.lib;sdl2main.lib;comctl32.lib;rpcrt4.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="main\cpaldata.cpp" />
+    <ClCompile Include="main\palsurface.cpp" />
+    <ClCompile Include="main\paltexture.cpp" />
+    <ClCompile Include="palmain\main.cpp" />
+    <ClCompile Include="main\caviplay.cpp" />
+    <ClCompile Include="main\cbattle.cpp" />
+    <ClCompile Include="main\cbattlebase.cpp" />
+    <ClCompile Include="main\CConfig.cpp" />
+    <ClCompile Include="main\cenemy.cpp" />
+    <ClCompile Include="main\cfight.cpp" />
+    <ClCompile Include="main\cgameui.cpp" />
+    <ClCompile Include="main\cmap.cpp" />
+    <ClCompile Include="main\cmenu.cpp" />
+    <ClCompile Include="main\Convers.cpp" />
+    <ClCompile Include="main\cpalbase.cpp" />
+    <ClCompile Include="main\cpalbaseio.cpp" />
+    <ClCompile Include="main\cpalevent.cpp" />
+    <ClCompile Include="main\cpaleventhandler.cpp" />
+    <ClCompile Include="main\CPalMain.cpp" />
+    <ClCompile Include="main\cpalui.cpp" />
+    <ClCompile Include="main\cplayer.cpp" />
+    <ClCompile Include="main\cres.cpp" />
+    <ClCompile Include="main\cscene.cpp" />
+    <ClCompile Include="main\cscreen.cpp" />
+    <ClCompile Include="main\cscript.cpp" />
+    <ClCompile Include="main\cuibattle.cpp" />
+    <ClCompile Include="main\pal1.cpp" />
+    <ClCompile Include="main\yj_compress.cpp" />
+    <ClCompile Include="sound\adplug\binfile.cpp" />
+    <ClCompile Include="sound\adplug\binio.cpp" />
+    <ClCompile Include="sound\adplug\dosbox_opls.cpp" />
+    <ClCompile Include="sound\adplug\emuopls.cpp" />
+    <ClCompile Include="sound\adplug\fprovide.cpp" />
+    <ClCompile Include="sound\adplug\mame_opls.cpp" />
+    <ClCompile Include="sound\adplug\nuked_opl.c" />
+    <ClCompile Include="sound\adplug\player.cpp" />
+    <ClCompile Include="sound\adplug\rix.cpp" />
+    <ClCompile Include="sound\adplug\surroundopl.cpp" />
+    <ClCompile Include="sound\caudiodevice.cpp" />
+    <ClCompile Include="sound\caudiorixplayer.cpp" />
+    <ClCompile Include="sound\cmp3player.cpp" />
+    <ClCompile Include="sound\coggplayer.cpp" />
+    <ClCompile Include="sound\csound.cpp" />
+    <ClCompile Include="sound\libmad\bit.c" />
+    <ClCompile Include="sound\libmad\decoder.c" />
+    <ClCompile Include="sound\libmad\fixed.c" />
+    <ClCompile Include="sound\libmad\frame.c" />
+    <ClCompile Include="sound\libmad\huffman.c" />
+    <ClCompile Include="sound\libmad\layer12.c" />
+    <ClCompile Include="sound\libmad\layer3.c" />
+    <ClCompile Include="sound\libmad\music_mad.c" />
+    <ClCompile Include="sound\libmad\resampler.c" />
+    <ClCompile Include="sound\libmad\stream.c" />
+    <ClCompile Include="sound\libmad\synth.c" />
+    <ClCompile Include="sound\libmad\timer.c" />
+    <ClCompile Include="sound\midiplayer.cpp" />
+    <ClCompile Include="sound\native_midi\native_midi.cpp" />
+    <ClCompile Include="sound\native_midi\native_midi_common.c" />
+    <ClCompile Include="sound\soundplayer.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="main\cpaldata.h" />
+    <ClInclude Include="main\sdl2_compat.h" />
+    <ClInclude Include="sound\adplug\binfile.h" />
+    <ClInclude Include="sound\adplug\binio.h" />
+    <ClInclude Include="sound\adplug\convertopl.h" />
+    <ClInclude Include="sound\adplug\dosbox\dbopl.cpp.h" />
+    <ClInclude Include="sound\adplug\dosbox\dbopl.h" />
+    <ClInclude Include="sound\adplug\dosbox\dosbox.h" />
+    <ClInclude Include="sound\adplug\dosbox\opl.cpp.h" />
+    <ClInclude Include="sound\adplug\dosbox\opl.h" />
+    <ClInclude Include="sound\adplug\dosbox_opls.h" />
+    <ClInclude Include="sound\adplug\emuopls.h" />
+    <ClInclude Include="sound\adplug\fprovide.h" />
+    <ClInclude Include="sound\adplug\mame\fmopl.cpp.h" />
+    <ClInclude Include="sound\adplug\mame\fmopl.h" />
+    <ClInclude Include="sound\adplug\mame\mame.h" />
+    <ClInclude Include="sound\adplug\mame\ymf262.cpp.h" />
+    <ClInclude Include="sound\adplug\mame\ymf262.h" />
+    <ClInclude Include="sound\adplug\mame_opls.h" />
+    <ClInclude Include="sound\adplug\nuked\opl3.c.h" />
+    <ClInclude Include="sound\adplug\nuked\opl3.h" />
+    <ClInclude Include="sound\adplug\nuked_opl.h" />
+    <ClInclude Include="sound\adplug\opl.h" />
+    <ClInclude Include="sound\adplug\opltypes.h" />
+    <ClInclude Include="sound\adplug\player.h" />
+    <ClInclude Include="sound\adplug\rix.h" />
+    <ClInclude Include="sound\adplug\surroundopl.h" />
+    <ClInclude Include="sound\caudiodevice.h" />
+    <ClInclude Include="sound\cpalsound.h" />
+    <ClInclude Include="sound\cpalmp3player.h" />
+    <ClInclude Include="sound\cpalmidiplayer.h" />
+    <ClInclude Include="sound\cpalrixpler.h" />
+    <ClInclude Include="main\caviplay.h" />
+    <ClInclude Include="main\cbattle.h" />
+    <ClInclude Include="main\cbattlebase.h" />
+    <ClInclude Include="main\CConfig.h" />
+    <ClInclude Include="main\cenemy.h" />
+    <ClInclude Include="main\cfight.h" />
+    <ClInclude Include="main\cgameui.h" />
+    <ClInclude Include="main\cgl_render.h" />
+    <ClInclude Include="main\cgl_texture.h" />
+    <ClInclude Include="main\command.h" />
+    <ClInclude Include="main\Convers.h" />
+    <ClInclude Include="main\cpalbase.h" />
+    <ClInclude Include="main\cpalbaseio.h" />
+    <ClInclude Include="main\cpalevent.h" />
+    <ClInclude Include="main\cpaleventhandler.h" />
+    <ClInclude Include="main\CPalMain.h" />
+    <ClInclude Include="main\cpalui.h" />
+    <ClInclude Include="main\cscene.h" />
+    <ClInclude Include="main\cscreen.h" />
+    <ClInclude Include="main\cscript.h" />
+    <ClInclude Include="main\csdlscreen.h" />
+    <ClInclude Include="main\csound.h" />
+    <ClInclude Include="main\cuibattle.h" />
+    <ClInclude Include="main\palerror.h" />
+    <ClInclude Include="main\palgpgl.h" />
+    <ClInclude Include="main\palsurface.h" />
+    <ClInclude Include="main\paltexture.h" />
+    <ClInclude Include="main\pal_color.h" />
+    <ClInclude Include="main\pal_surface.h" />
+    <ClInclude Include="sound\caudioplayer.h" />
+    <ClInclude Include="sound\csound.h" />
+    <ClInclude Include="sound\libmad\bit.h" />
+    <ClInclude Include="sound\libmad\decoder.h" />
+    <ClInclude Include="sound\libmad\fixed.h" />
+    <ClInclude Include="sound\libmad\frame.h" />
+    <ClInclude Include="sound\libmad\huffman.h" />
+    <ClInclude Include="sound\libmad\layer12.h" />
+    <ClInclude Include="sound\libmad\layer3.h" />
+    <ClInclude Include="sound\libmad\libmad_config.h" />
+    <ClInclude Include="sound\libmad\libmad_global.h" />
+    <ClInclude Include="sound\libmad\mad.h" />
+    <ClInclude Include="sound\libmad\music_mad.h" />
+    <ClInclude Include="sound\libmad\resampler.h" />
+    <ClInclude Include="sound\libmad\stream.h" />
+    <ClInclude Include="sound\libmad\synth.h" />
+    <ClInclude Include="sound\libmad\timer.h" />
+    <ClInclude Include="sound\native_midi\native_midi.h" />
+    <ClInclude Include="sound\native_midi\native_midi_common.h" />
+    <ClInclude Include="sound\oggplay.h" />
+    <ClInclude Include="sound\oggplayer.h" />
+    <ClInclude Include="sound\soundplay.h" />
+    <ClInclude Include="sound\soundplayer.h" />
+    <ClInclude Include="sound\soundseting.h" />
+    <ClInclude Include="s\cmainframe.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="main\res\s.rc" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>
