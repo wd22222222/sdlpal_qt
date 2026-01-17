@@ -113,7 +113,9 @@ vcpkg install libvorbis:x64-windows-static
 vcpkg integrate install
 
 #第四步
+
 #下载并安装qt插件
+
 #Qt VS Tools for Visual Studio 2022
 
 #至此，全部环境搭建完成。如无意外，将可以编译运行成功了。
