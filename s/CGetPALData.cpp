@@ -1349,8 +1349,7 @@ PalErr CGetPalData::SingleScriptChange(int sOld, int sNew, MAPScript& st)
 			else
 			{
 				obj = pal->gpGlobals->getSaveFileObject(3, row, col,
-					pal->gpGlobals->rgSaveData.at(save - 1 +
-						CPalEvent::ggConfig->m_Function_Set[53]));
+					pal->gpGlobals->rgSaveData.at(save - 1));
 			}
 			assert(*obj == sOld);
 			break;

@@ -11,16 +11,11 @@
 #include <cassert>
 #include <qapplication.h>
 #include <qdebug.h>
-//#include <qdesktopwidget.h>
 #include <qdir.h>
 #include <qevent.h>
 #include <qfiledialog.h>
-#include <qformlayout.h>
 #include <qmessagebox.h>
-#include <QPushButton>
-#include <qscrollbar.h>
-#include <qstandarditemmodel.h>
-//#include <qtextcodec.h>
+#include <map>
 #if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
 #include <QDesktopWidget>
 #else
@@ -1644,14 +1639,14 @@ void MainWindow::SelectTreeItem(QTreeWidgetItem* item)
         //
         if (JobCtrl > 0)
         {
-            //存档文件数据
-            m_Pal->pal->gpGlobals->PAL_SaveGame(JobCtrl,
-                *((WORD*)m_Pal->pal->gpGlobals->rgSaveData[JobCtrl - 1].data()), 1);
+            //装入存档文件数据
+            m_Pal->pal->gpGlobals->PAL_LoadGame(m_Pal->pal->gpGlobals->rgSaveData[JobCtrl - 1]);
         }
         else
         {
             //缺省数据
-            m_Pal->saveGameDataToCache();
+            m_Pal->pal->gpGlobals->PAL_LoadDefaultGame();
+            //m_Pal->saveGameDataToCache();
         }
     }
     haveModified = 0;
@@ -2001,8 +1996,14 @@ void MainWindow::DataUpDate(int Work)
             m_Pal->pal->gpGlobals->g.rgObject[name].player.wScriptOnFriendDeath = s1;
             m_Pal->pal->gpGlobals->g.rgObject[name].player.wScriptOnDying = s2;
         }
-        if(JobCtrl == 0)
+        if (JobCtrl <= 0)
             m_Pal->saveGameDataToCache();
+        else
+        {
+            int saveTime = *((WORD*)m_Pal->pal->gpGlobals->rgSaveData[JobCtrl - 1].data());
+            //存档文件数据
+            m_Pal->pal->gpGlobals->PAL_SaveGame(m_Pal->pal->gpGlobals->rgSaveData[JobCtrl - 1],saveTime );
+        }
         break;
     }
     case WM_EDIT_ENEMY://怪物
@@ -2031,8 +2032,14 @@ void MainWindow::DataUpDate(int Work)
             enemy.wScriptOnReady = get<int>(m_DataArray[r].ColVarList[39]);//战斗脚本
             enemy.wScriptOnBattleEnd = get<int>(m_DataArray[r].ColVarList[40]);//战后脚本
         }
-        if (JobCtrl == 0)
+        if (JobCtrl <= 0)
             m_Pal->saveGameDataToCache();
+        else
+        {
+            int saveTime = *((WORD*)m_Pal->pal->gpGlobals->rgSaveData[JobCtrl - 1].data());
+            //存档文件数据
+            m_Pal->pal->gpGlobals->PAL_SaveGame(m_Pal->pal->gpGlobals->rgSaveData[JobCtrl - 1], saveTime);
+        }
         break;
     }
     case WM_EDIT_MAGIC://魔法
@@ -2059,8 +2066,14 @@ void MainWindow::DataUpDate(int Work)
             m_Pal->pal->gpGlobals->g.rgObject[wOMagicID].magic.wScriptOnUse = get<int>(m_DataArray[r].ColVarList[19]);
             m_Pal->pal->gpGlobals->g.rgObject[wOMagicID].magic.wScriptOnSuccess = get<int>(m_DataArray[r].ColVarList[20]);
         }
-        if (JobCtrl == 0)
+        if (JobCtrl <= 0)
             m_Pal->saveGameDataToCache();
+        else
+        {
+            int saveTime = *((WORD*)m_Pal->pal->gpGlobals->rgSaveData[JobCtrl - 1].data());
+            //存档文件数据
+            m_Pal->pal->gpGlobals->PAL_SaveGame(m_Pal->pal->gpGlobals->rgSaveData[JobCtrl - 1], saveTime);
+        }
         break;
     }
     case WM_EditBattleField://战斗场所
@@ -2093,6 +2106,7 @@ void MainWindow::DataUpDate(int Work)
             m_Pal->saveGameDataToCache();
         break;
     }
+    ////////
     case WM_EditEventObject:  //事件对象
     {
         //检查行数变化
@@ -2114,20 +2128,35 @@ void MainWindow::DataUpDate(int Work)
                 continue;
             }
             LPWORD d = (LPWORD)(&p.lprgEventObject[r]);
+			//逐行替换数据 共16个数据
             for (int n = 0; n < 16; n++)
             {
+				//数据从第三列开始，第一列第二列为序号和场景号 第19列和第20列为行号和原行号 共16个数据
                 d[n] = get<int>(m_DataArray[r].ColVarList[n + 2]) & 0xffff;
             }
         }
-        //增加减少删除行处理
-          //事件对象
+        if (JobCtrl > 0)
         {
-            MAPScript st;//生成新旧行号对照表
+            int saveTime = *((WORD*)m_Pal->pal->gpGlobals->rgSaveData[JobCtrl - 1].data());
+            //存档文件数据
+            m_Pal->pal->gpGlobals->PAL_SaveGame(m_Pal->pal->gpGlobals->rgSaveData[JobCtrl - 1], saveTime);
+            return;
+        }
+        //增加减少删除行处理
+        {
+            std::map<int,int> stOld;//生成新旧行号对照表 map<oldlRow,newrow>
+            std::map<int, int> stNew;//生成新旧行号对照表 map<newrow,Oldrow>
+            int insertRow{};
             for (int k = 0; k < nsize; k++)
             {
-                st[m_DataArray[k].oldRow] = get<int>(m_DataArray[k].ColVarList[0]) + 1;
+                auto newRow = k + 1;
+                auto oldRow = m_DataArray[k].oldRow;
+                if (oldRow == 0)
+                    oldRow = --insertRow;
+                stOld[oldRow] = newRow;
+                stNew[newRow] = oldRow;
             }
-            //更新脚本
+            //更新脚本中的所有指向事件对象的值
             for (int n = 0; n < m_Pal->pal->gpGlobals->g.nScriptEntry; n++)
             {
                 LPWORD p1{ 0 }, p2{ 0 };
@@ -2162,15 +2191,14 @@ void MainWindow::DataUpDate(int Work)
                 }
                 if (p1 && *p1 != 0xffff && *p1 != 0)
                 {
-                    MAPScript::iterator pw;
-                    pw = st.find(*p1);
-                    if (pw == st.end())
+                    std::map<int,int>::iterator pw;
+                    pw = stOld.find(*p1);
+                    if (pw == stOld.end())
                     {
                         //没有找到出错
                         auto ss = QString::asprintf("数据错，原有对象 %4.4X 被删除", *p1);
                         ShowMessage(ss);
-                        return;
-                        break;
+                        return;                    
                     }
                     if (pw->first != pw->second)
                     {
@@ -2180,9 +2208,9 @@ void MainWindow::DataUpDate(int Work)
                 }
                 if (p2 && *p2)
                 {
-                    MAPScript::iterator pw;
-                    pw = st.find(*p2);
-                    assert(pw != st.end());
+                    std::map<int, int>::iterator pw;
+                    pw = stOld.find(*p2);
+                    assert(pw != stOld.end());
                     if (pw->first != pw->second)
                     {
                         //新旧入口不一致，需要修改，用新入口替换旧入口
@@ -2190,72 +2218,65 @@ void MainWindow::DataUpDate(int Work)
                     }
                 }
             }
-            //更新场景表
-            for (int n = 0; n < MAX_SCENES; n++)
-            {
-                WORD* p = &m_Pal->pal->gpGlobals->g.rgScene[n].wEventObjectIndex;
-                if (!*p) continue;
-                MAPScript::iterator pw = st.find(*p);
-                assert(pw != st.end());
-                if (pw->first != pw->second)
-                {
-                    //新旧入口不一致，需要修改，用新入口替换旧入口
-                    *p = pw->second;
-                }
-            }
-            m_Pal->pal->gpGlobals->rgSaveData;
 
-            for (int n = 0; n < m_Pal->pal->gpGlobals->rgSaveData[n].size(); n++)
+            //更新场景表
+            for (int n_scene = 0, wIndex = 0, wEventObject = 0; n_scene < m_Pal->pal->gpGlobals->g.nScene - 1; n_scene++)
             {
-                if ((m_Pal->pal->gpGlobals->rgSaveData[n].size()) == 0)
+                wIndex = m_Pal->pal->gpGlobals->g.rgScene[n_scene + 1].wEventObjectIndex;
+                while (wIndex > m_DataArray[wEventObject].oldRow)
+                    wEventObject++;
+                if (wIndex < m_DataArray[wEventObject].oldRow)
+                    wEventObject--;
+                m_Pal->pal->gpGlobals->g.rgScene[n_scene + 1].wEventObjectIndex = wEventObject + 1;
+            }
+            //将结果保存
+            m_Pal->saveGameDataToCache();
+
+            //使用新旧行对照表更新存盘数据中的事件对象 全部数据
+            for (int n_save = 0; n_save < m_Pal->pal->gpGlobals->rgSaveData[n_save].size(); n_save++)
+            {
+                auto& p = m_Pal->pal->gpGlobals->g;
+                if ((m_Pal->pal->gpGlobals->rgSaveData[n_save].size()) == 0)
                     continue;
-                int sIns = 0, sDel = 0;
-                int chage = m_DataArray.size() - m_Pal->pal->gpGlobals->g.nEventObject;
-                for (int r = 0; r < m_DataArray.size(); r++)
+                //从缓存中载入游戏数据
+                m_Pal->pal->gpGlobals->PAL_LoadGame(m_Pal->pal->gpGlobals->rgSaveData[n_save]);
+                //更新场景表
+                for (int n_scene = 0, wIndex = 0, wEventObject = 0; n_scene < p.nScene - 1; n_scene++)
                 {
-                    if (m_DataArray[r].oldRow)
+                    wIndex = p.rgScene[n_scene + 1].wEventObjectIndex;
+                    while (wIndex > m_DataArray[wEventObject].oldRow)
+                        wEventObject++;
+                    if (wIndex < m_DataArray[wEventObject].oldRow)
+                        wEventObject--;
+                    //assert(m_Pal->pal->gpGlobals->g.rgScene[n_scene + 1].wEventObjectIndex == wEventObject + 1);
+                    p.rgScene[n_scene + 1].wEventObjectIndex = wEventObject + 1;
+                }
+                //更新事件对象表
+                for (int k = 0,oldRow = 1; k < m_DataArray.size(); k++)
+                {                   
+                    //原行号大于0 但不等于 oldRow
+                    if (m_DataArray[k].oldRow && m_DataArray[k].oldRow != oldRow)
                     {
-                        int oldRow = m_DataArray[r].oldRow;
-                        if (oldRow + sIns - sDel > r + 1)
-                        {
-                            int nDel = oldRow + sIns - sDel - r - 1;
-                            //刪除之後的nDel行
-                            size_t pos = m_Pal->pal->gpGlobals->getSaveFileOffset(1) + sizeof(EVENTOBJECT) * r;
-                            m_Pal->pal->gpGlobals->rgSaveData[n].erase(m_Pal->pal->gpGlobals->rgSaveData[n].begin() + pos,
-                                m_Pal->pal->gpGlobals->rgSaveData[n].begin() + pos + sizeof(EVENTOBJECT) * nDel);
-                            sDel += nDel;
-                        }
+                        //属于 k 的原行已经被删除
+                        p.lprgEventObject.erase(p.lprgEventObject.begin() + k);
+                        k--;
+                        oldRow++;
                         continue;
                     }
-                    //新行，插入
-                    ByteArray p(sizeof(EVENTOBJECT));
-                    //拷贝需插入的数据
-                    memcpy(&p[0], &m_Pal->pal->gpGlobals->g.lprgEventObject[r], p.size());
-                    //计算插入位置
-                    size_t pos = m_Pal->pal->gpGlobals->getSaveFileOffset(1) + sizeof(EVENTOBJECT) * r;
-                    //对象区起始位置newLen - Pal->gpGlobals->g.nEventObject * sizeof(EVENTOBJECT)
-                    m_Pal->pal->gpGlobals->rgSaveData[n].insert(m_Pal->pal->gpGlobals->rgSaveData[n].begin() + pos, p.begin(), p.end());
-                    sIns++;
+                    else  if (m_DataArray[k].oldRow == 0)
+                    {
+                        //新增行，插入
+                        EVENTOBJECT newObj{};
+                        p.lprgEventObject.insert(p.lprgEventObject.begin() + k, newObj);
+                    }
+                    else
+                        oldRow++;
                 }
-                int savefilelen = m_Pal->pal->gpGlobals->getSaveFileLen();
-                //assert(m_Pal->pal->gpGlobals->rgSaveData[n].size() == savefilelen);
-                //更新对象位置数据
-                //更新场景数据
-                LPSCENE p = m_Pal->pal->gpGlobals->getSecensPoint(&m_Pal->pal->gpGlobals->rgSaveData[n][0]);
-                for (int k = 0; k < MAX_SCENES; k++)
-                {
-                    p[k].wEventObjectIndex = m_Pal->pal->gpGlobals->g.rgScene[k].wEventObjectIndex;
-                }
+				//保存到存盘数据
+                int saveTime = *((WORD*)m_Pal->pal->gpGlobals->rgSaveData[n_save].data());
+				m_Pal->pal->gpGlobals->PAL_SaveGame(m_Pal->pal->gpGlobals->rgSaveData[n_save], saveTime);
             }
-
-            JobCtrl = 0;
-            //delete m_Pal;
-            //m_Pal = new CGetPalData(0, 1);
-            m_Pal->saveGameDataToCache();
-            return;
         }
-        if (JobCtrl == 0)
-            m_Pal->saveGameDataToCache();
         break;
     }
     case WM_EditStore://商店
@@ -2277,7 +2298,7 @@ void MainWindow::DataUpDate(int Work)
                     p.lprgStore[n_Row].rgwItems[n_Item] = get<int>(m_DataArray[n_Row].ColVarList[n_Item + 2]);
                 }
             }
-        if (JobCtrl == 0)
+        if (JobCtrl <= 0)
             m_Pal->saveGameDataToCache();
         break;
     }
@@ -2294,7 +2315,7 @@ void MainWindow::DataUpDate(int Work)
                 wFlags |= get<int>(m_DataArray[r].ColVarList[n]) << (n - 7);
             p.rgObject[j].item.wFlags = wFlags;
         }
-        if (JobCtrl == 0)
+        if (JobCtrl <= 0)
             m_Pal->saveGameDataToCache();
         break;
     }
@@ -2348,7 +2369,7 @@ void MainWindow::DataUpDate(int Work)
             }
             //m_Grid->set_t_Data(m_Grid->getDataArray()->d_Array);
         }
-        if (JobCtrl == 0)
+        if (JobCtrl <= 0)
             m_Pal->saveGameDataToCache();
         break;
     }
@@ -2372,7 +2393,7 @@ void MainWindow::DataUpDate(int Work)
                 p->lprgLevelUpMagic[r].m[j].wMagic = get<int>(m_DataArray[r].ColVarList[j * 2 + 2]);
             }
         }
-        if (JobCtrl == 0)
+        if (JobCtrl <= 0)
             m_Pal->saveGameDataToCache();
         break;
     }
@@ -2387,7 +2408,7 @@ void MainWindow::DataUpDate(int Work)
             p.rgObject[j].poison.wPlayerScript = get<int>(m_DataArray[r].ColVarList[4]);//
             p.rgObject[j].poison.wEnemyScript = get<int>(m_DataArray[r].ColVarList[5]);//
         }
-        if (JobCtrl == 0)
+        if (JobCtrl <= 0)
             m_Pal->saveGameDataToCache();
         break;
     }
@@ -2460,10 +2481,11 @@ void MainWindow::DataUpDate(int Work)
                     }
                 }
         }
-        if (JobCtrl == 0)
+        if (JobCtrl <= 0)
             m_Pal->saveGameDataToCache();
         break;
     }
+
     case WM_EDIT_PARAMETERS://基本属性编辑
     {
         for (int r = 0; r < nsize; r++)
@@ -2471,6 +2493,13 @@ void MainWindow::DataUpDate(int Work)
             //一行数据
             m_Pal->pal->gpGlobals->dwCash = get<int>(m_DataArray[0].ColVarList[1]);
             m_Pal->pal->gpGlobals->wCollectValue = get<int>(m_DataArray[1].ColVarList[1]);
+        }
+        if (JobCtrl > 0)
+        {
+            int saveTime = *((WORD*)m_Pal->pal->gpGlobals->rgSaveData[JobCtrl - 1].data());
+            //存档文件数据
+            m_Pal->pal->gpGlobals->PAL_SaveGame(m_Pal->pal->gpGlobals->rgSaveData[JobCtrl - 1], saveTime);
+            return;
         }
         break;
     }
@@ -2596,13 +2625,11 @@ void MainWindow::DataUpDate(int Work)
     }
     case WM_EditFontLibraryPath:
         //修改字库路径
-
         break;
     default:
         break;
     }
 }
-
 
 //修改目录 ，没有改变返回0 ，否则返回 1,出错返回-1
 INT MainWindow::DoChangeDir(bool change)

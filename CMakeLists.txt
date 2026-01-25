@@ -11,11 +11,11 @@ set(USING_OGG 1)
 
 #step 1: 设置vcpkg工具链
 if(USING_STATIC)
-    set(VCPKG_ROOT "d:/drv/vcpkg" CACHE PATH "Path to vcpkg root")
+    set(VCPKG_ROOT "d:/d/vcpkg" CACHE PATH "Path to vcpkg root")
     set(VCPKG_TARGET_TRIPLET "x64-windows-static" CACHE STRING "vcpkg target triplet (static)")
     set(CMAKE_TOOLCHAIN_FILE "${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CACHE STRING "")
 else()
-    set(VCPKG_ROOT "d:/drv/vcpkg" CACHE PATH "Path to vcpkg root")
+    set(VCPKG_ROOT "d:/d/vcpkg" CACHE PATH "Path to vcpkg root")
     set(VCPKG_TARGET_TRIPLET "x64-windows" CACHE STRING "")
     set(CMAKE_TOOLCHAIN_FILE "${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CACHE STRING "")
 endif()

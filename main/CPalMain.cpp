@@ -485,6 +485,7 @@ VOID CPalMain::PAL_StartFrame(
         //自动存盘
         std::cout << "Ctrl+S detected: Auto-saving the game.\n";
         gpGlobals->PAL_SaveGame(1, 1, p_DataCopy != nullptr);
+        SOUND_Play(28);
     }
     if (--gpGlobals->wChasespeedChangeCycles == 0)
     {

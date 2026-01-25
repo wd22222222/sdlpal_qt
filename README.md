@@ -136,5 +136,4 @@ Qt VS Tools for Visual Studio 2022
 
 6,同样，目前支持sdl2和sdl3 今后的后续版本中还将继续支持，直到有了sdl3的后续版本。
 
-7.目前发现，SDL3最新版本3.4.0存在一个BUG，如SDL_PollEvent在非主线线程发起将给出一个SDL_assert(SDL_IsMainThread())的断言，不知出于何种考虑，与之前的版本不兼容。预计在之后的版本中应该改掉。
 
