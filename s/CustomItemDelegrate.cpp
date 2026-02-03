@@ -20,12 +20,11 @@
 //
 
 #include "CustomItemDelegrate.h"
-//#include <QComboBox>
-#include <qdebug.h>
 #include "cviewmodel.h"
 #include "cpopview.h"
-
-//static CCellID prvCell;
+#include <qdebug.h>
+#include <qheaderview.h>
+#include <qscrollbar.h>
 static CPopView* m_PopListView;
 
 CustomItemDelegrate::CustomItemDelegrate(const QRegExp& regExp, QObject* parent)
@@ -104,8 +103,8 @@ QWidget *  CustomItemDelegrate::setPopListView( const QModelIndex& index,QObject
     CEditlistModel* popModel = new CEditlistModel(list, m_PopListView);
 
     m_PopListView->setModel(popModel);
-    m_PopListView->setColumnWidth(0, 38);
-    m_PopListView->setColumnWidth(1, 45);
+    m_PopListView->setColumnWidth(0, 44);
+    m_PopListView->setColumnWidth(1, 47);
     m_PopListView->setColumnWidth(2, 93);
     m_PopListView->verticalHeader()->setVisible(false);
     //获得值对应的行
@@ -126,10 +125,8 @@ QWidget *  CustomItemDelegrate::setPopListView( const QModelIndex& index,QObject
     m_PopListView->show();
     //点击后启动
     connect(m_PopListView, &CPopView::clicked, this, [&](const QModelIndex& index)->void {
-        //int sRow = index.row();
         QVariant val = m_PopListView->model()->data(m_PopListView->model()->index(index.row(), 1), Qt::DisplayRole);
-        m_PopListView->Text = QString("%1)").arg(val.toString().toInt(0, 16));//将返回的16进制数转换为10 进制
-        //m_PopListView->Text = val.toString();
+        m_PopListView->Text = QString("%1").arg(val.toString().toInt(0, 16));//将返回的16进制数转换为10 进制
         m_PopListView->hide();
         });
     return m_PopListView;
@@ -147,7 +144,8 @@ bool CustomItemDelegrate::eventFilter(QObject* editor, QEvent* event)
 
         // 获取当前编辑的索引
         QWidget* widget = qobject_cast<QWidget*>(editor);
-        //qDebug() << "编辑器失去焦点，原因:";
+        
+        qDebug() << "编辑器失去焦点，原因:";
 
         // 提交数据
         emit commitData(widget);

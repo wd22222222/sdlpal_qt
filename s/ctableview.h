@@ -1,13 +1,13 @@
 #pragma once
 #include "..\main\command.h"
-#include <variant>
+//#include <variant>
 #include <qtableview.h>
-#include <qmenu.h>
-#include <qheaderview.h>
-#include <qscrollbar.h>
+//#include <qmenu.h>
+//#include <qheaderview.h>
+//#include <qscrollbar.h>
 #include <qevent.h>
 #include "cviewmodel.h"
-#include "cpopview.h"
+//#include "cpopview.h"
 #include "ccellrange.h"
 #include "t_data.h"
 
@@ -37,20 +37,20 @@ private:
 		int btw{};//表头宽度
 		int bw{};//表宽度
 	} TableSize;
-
 public:
 	//保存修改数据，用于数组
 	int UndoCtrl{ 0 };
 	//弹出菜单控制数据 从尾部计算 4 位跳转相关 5 空 6-8 插入追加删除 11 部属，脚本，调用 
 	DWORD  m_popMenuFlags{};
 	//class CPopTable * m_popView{};
+	int indexScene{ -1 };//场景号位置 用于在地图上布置场景
 public:
     CTableView(QWidget* parent = (QWidget*)nullptr);
 	~CTableView();
 	void resize(const int w, const int h);
 	void clear() 
 	{
-		setModel(nullptr); s1->setModel(nullptr); hide();
+		setModel(nullptr); s1->setModel(nullptr);
 		t_Data.UndoCount = 0;
 		t_Data.u_Array.clear();
 	};

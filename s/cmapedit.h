@@ -1,15 +1,20 @@
 #pragma once
 #include <qtableview.h>
-#include <qdialog.h>
-#include <qtextedit.h>
-#include <qscrollarea.h>
-#include <qlabel.h>
 #include <vector>
-#include <qpainter.h>
-#include <qscrollbar.h>
 #include "cviewmodel.h"
 #include "CPixEdit.h"
 #include "cgetpaldata.h"
+#include <Windows.h>
+#include <cstdint>
+#include <qabstractitemmodel.h>
+#include <qpoint.h>
+#if QT_VERSION >= QT_VERSION_CHECK( 6,0, 0)
+#include <qtmetamacros.h>
+#endif
+#include <qevent.h>
+#include <qimage.h>
+#include <qwidget.h>
+#include "t_data.h"
 
 
 enum tagMapFlags
@@ -28,9 +33,9 @@ enum tagMapFlags
 
 typedef struct ragUndo
 {
-	DWORD32 tPos{};
-	DWORD32 tOld{};
-	DWORD32 tNew{};
+	uint32_t tPos{};
+	uint32_t tOld{};
+	uint32_t tNew{};
 }MAPUNDO;
 
 typedef std::vector<MAPUNDO> MapUndoArray;
@@ -43,7 +48,6 @@ class CMapEdit :public CPixEdit
 {
 	Q_OBJECT
 protected:
-	QTableView* m_ImageList{};//图片列表
 	CViewModel* m_ImageModel{};//图片数据模型
 	T_DATA s_Data;//地图列表数据
 	T_DATA s_ImageData;//图片列表数据
@@ -57,7 +61,7 @@ protected:
 	virtual void resizeEvent(QResizeEvent* event)override;
 	void init(int map);
 	//生成地图
-	INT MakeMapImage(QImage& m, const DWORD flag);
+	int MakeMapImage(QImage& m, const DWORD flag);
 	//根据几个关键变量绘制大地图和小地图
 	// Plot large and small maps based on a few key variables
     void drawAllMap()override;

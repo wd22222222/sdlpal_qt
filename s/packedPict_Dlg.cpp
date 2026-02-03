@@ -708,10 +708,10 @@ void PackedPict_Dlg::init()
 	m_ListModel = new CViewModel;
 	m_ListModel->set_t_Data(&s_Data);
 	m_List->setModel(m_ListModel);
-	m_List->setColumnWidth(0, 60);
-	m_List->setColumnWidth(1, 100);
+	m_List->setColumnWidth(0, 50);
+	m_List->setColumnWidth(1, 60);
 	if (m_Type == 3)
-		m_List->setColumnWidth(2, 60);
+		m_List->setColumnWidth(2, 50);
 	m_List->setCurrentIndex(m_ListModel->index(m_ListSelectRow, 0));
 
 	QObject::connect(m_List->selectionModel(), &QItemSelectionModel::selectionChanged,

@@ -3757,14 +3757,15 @@ VOID CFight::PAL_BattleEnemyPerformAction(
 						((gpGlobals->rgPlayerStatus[w][kStatusProtect] > 0) ? 2 : 1)) +
 						(rgfMagAutoDefend[i] ? 1 : 0);
 
-#ifdef GAIN_MORE_HIDDEN_EXP
-					if (rgfMagAutoDefend[i] == TRUE)
-					{
-						gpGlobals->Exp.rgDefenseExp[wPlayerRole].wCount += RandomLong(0, 1);
-						gpGlobals->Exp.rgDexterityExp[wPlayerRole].wCount += RandomLong(0, 1);
-						gpGlobals->Exp.rgFleeExp[wPlayerRole].wCount += RandomLong(0, 1);
-					}
-#endif
+//#ifdef GAIN_MORE_HIDDEN_EXP
+					if (ggConfig->m_Function_Set[54])//更多的隐藏经验
+						if (rgfMagAutoDefend[i] == TRUE)
+						{
+							gpGlobals->Exp.rgDefenseExp[wPlayerRole].wCount += RandomLong(0, 1);
+							gpGlobals->Exp.rgDexterityExp[wPlayerRole].wCount += RandomLong(0, 1);
+							gpGlobals->Exp.rgFleeExp[wPlayerRole].wCount += RandomLong(0, 1);
+						}
+//#endif
 
 					iDamage = std::max(iDamage, 0);
 					iDamage = std::min(iDamage,(int) gpGlobals->g.PlayerRoles.rgwHP[w]);
@@ -3797,14 +3798,15 @@ VOID CFight::PAL_BattleEnemyPerformAction(
 					((gpGlobals->rgPlayerStatus[wPlayerRole][kStatusProtect] > 0) ? 2 : 1)) +
 					(fAutoDefend ? 1 : 0);
 
-#ifdef GAIN_MORE_HIDDEN_EXP
-				if (fAutoDefend == TRUE)
-				{
-					gpGlobals->Exp.rgDefenseExp[wPlayerRole].wCount += RandomLong(0, 1);
-					gpGlobals->Exp.rgDexterityExp[wPlayerRole].wCount += RandomLong(0, 1);
-					gpGlobals->Exp.rgFleeExp[wPlayerRole].wCount += RandomLong(0, 1);
-				}
-#endif
+//#ifdef GAIN_MORE_HIDDEN_EXP
+				if (ggConfig->m_Function_Set[54])//更多的隐藏经验
+					if (fAutoDefend == TRUE)
+					{
+						gpGlobals->Exp.rgDefenseExp[wPlayerRole].wCount += RandomLong(0, 1);
+						gpGlobals->Exp.rgDexterityExp[wPlayerRole].wCount += RandomLong(0, 1);
+						gpGlobals->Exp.rgFleeExp[wPlayerRole].wCount += RandomLong(0, 1);
+					}
+//#endif
 
 				iDamage = std::max(iDamage, 0);
 				iDamage = std::min(iDamage,(int) gpGlobals->g.PlayerRoles.rgwHP[wPlayerRole]);
@@ -4640,14 +4642,15 @@ VOID CFight::PAL_BattleEnemyPhysical(WORD wEnemyIndex, WORD wPlayerID)
 
 	iSound = g_Battle.rgEnemy[wEnemyIndex].e.wCallSound;
 
-#ifdef GAIN_MORE_HIDDEN_EXP
-	if (fAutoDefend == TRUE)
-	{
-		gpGlobals->Exp.rgDefenseExp[wPlayerRole].wCount += RandomLong(0, 1);
-		gpGlobals->Exp.rgDexterityExp[wPlayerRole].wCount += RandomLong(0, 1);
-		gpGlobals->Exp.rgFleeExp[wPlayerRole].wCount += RandomLong(0, 1);
-	}
-#endif 
+//#ifdef GAIN_MORE_HIDDEN_EXP
+	if(ggConfig->m_Function_Set[54])//更多的隐藏经验
+		if (fAutoDefend == TRUE)
+		{
+			gpGlobals->Exp.rgDefenseExp[wPlayerRole].wCount += RandomLong(0, 1);
+			gpGlobals->Exp.rgDexterityExp[wPlayerRole].wCount += RandomLong(0, 1);
+			gpGlobals->Exp.rgFleeExp[wPlayerRole].wCount += RandomLong(0, 1);
+		}
+//#endif 
 
 	if (iCoverIndex != -1)
 	{

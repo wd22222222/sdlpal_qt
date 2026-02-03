@@ -301,7 +301,7 @@ QVariant CEditlistModel::data(const QModelIndex& index, int role) const
 	switch (col)
 	{
 	case 0:
-		t = QString::asprintf("%1", row + 1);
+		t = QString::asprintf("%4d", row + 1);
 		break;
 	case 1:
 		t = QString::asprintf("%4.4x", m_List->data[row].item);

@@ -198,9 +198,11 @@ None.
             case musicType::midi:
                 pushEventForPlay(eventTypeCustom::eventMidiMusicPlay, stream, len);
                 break;
+#if USING_OGG
             case musicType::ogg:
                 pushEventForPlay(eventTypeCustom::eventOggMusicPlay, stream, len);
                 break;
+#endif
             case musicType::mp3:
                 pushEventForPlay(eventTypeCustom::eventMp3MusicPlay, stream, len);
                 break;

@@ -568,10 +568,10 @@ CPalUI::PAL_FBPBlitToSurface(
         }
         else
         {
-            DWORD32 *p = (DWORD32*)(lpDstSurface->pixels) + y * lpDstSurface->pitch / 4;
+            uint32_t *p = (uint32_t*)(lpDstSurface->pixels) + y * lpDstSurface->pitch / 4;
             for (x = 0; x < 320; x++)
             {
-                *(p++) = *((DWORD32*)(&gpPalette->colors[*(lpBitmapFBP++)]));
+                *(p++) = *((uint32_t*)(&gpPalette->colors[*(lpBitmapFBP++)]));
             }
         }
 

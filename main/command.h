@@ -49,10 +49,10 @@ using ByteArray = std::vector<unsigned char>;
 #define INCREASE_ATTRIBUTE_AFTER_USE_MENGSHE		//灵儿使用梦蛇后，各项属性增加
 
 #define INCREASE_EXTRA_PLAYER_HPMP					//回复体力真气的时候，额外回复一定百分比（根据等级）
-#define INCREASE_EXTRA_HPMP_MIN_LEVEL		50
-#define INCREASE_EXTRA_HPMP_MAX_LEVEL		70
+//#define INCREASE_EXTRA_HPMP_MIN_LEVEL		50
+//#define INCREASE_EXTRA_HPMP_MAX_LEVEL		70
 
-#define New_EDIT_SCRIPT_OPERATION_0X0034			//修改灵葫炼丹为商店
+//#define New_EDIT_SCRIPT_OPERATION_0X0034			//修改灵葫炼丹为商店
 
 //解决幻影林天南 BUG
 #define LIN_TIAN_NAN_BUG
@@ -60,13 +60,13 @@ using ByteArray = std::vector<unsigned char>;
 #define USE_EVENTHANDLER   1                       //使用自定义EventHandler传递数据
 
 //设定控制100%
-#define Controlled100 1
+#define   Controlled100 1
 //设定夺魂100%
 //#define Prodigy100 1
 //设定物品掉落100%
-#define Drop_Rate100 1
+//#define Drop_Rate100 1
 
-#define GAIN_MORE_HIDDEN_EXP 1              // 更多的隐藏经验
+//#define GAIN_MORE_HIDDEN_EXP 1              // 更多的隐藏经验
 #define PAL_HAS_AVI		
 
 
@@ -189,6 +189,13 @@ extern "C"
 #define TRUE  1
 #define CP_UTF8                   65001       // UTF-8 translation
 
+#ifndef _WIN32
+    typedef unsigned long       DWORD;
+    typedef int                 BOOL;
+    typedef unsigned char       BYTE;
+    typedef unsigned short      WORD;
+    typedef float               FLOAT;
+#endif
     typedef char                CHAR;
     typedef short               SHORT;
     typedef long                LONG;
@@ -220,9 +227,10 @@ extern "C"
     typedef unsigned short      UINT16, * PUINT16;
     typedef unsigned int        UINT32, * PUINT32;
     typedef unsigned __int64    UINT64, * PUINT64;
-    typedef wchar_t WCHAR;
-    //typedef wchar_t*LPWSTR;
-    //typedef const WCHAR* LPCWSTR;
+    typedef wchar_t             WCHAR;
+#ifndef _WIN32
+    typedef unsigned short      WORD;
+#endif
     
     typedef __int64 LONGLONG;
 

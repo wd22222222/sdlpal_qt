@@ -19,6 +19,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#include <qheaderview.h>
 #include "cListScriptCall.h"
 #include "cviewmodel.h"
 #include "mainwindow.h"
@@ -57,7 +58,7 @@ CListScriptCall::CListScriptCall(MainWindow* para, unsigned short scriptEntry)
 			return;
 		DataArray& s_d = s_Data.d_Array;
 		s_d.resize(sgMark.size()); ;
-		for (DWORD32 n = 0; n < sgMark.size(); n++)
+		for (uint32_t n = 0; n < sgMark.size(); n++)
 		{
 			QString cS;
 			INT32 from = sgMark[n].from;

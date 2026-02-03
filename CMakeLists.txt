@@ -9,6 +9,9 @@ set(USING_SDL3 1)
 #设置ogg vorbis开关 
 set(USING_OGG 1)
 
+#设置 qt6 优先开关
+set(USE_QT6 1)
+
 #step 1: 设置vcpkg工具链
 if(USING_STATIC)
     set(VCPKG_ROOT "d:/d/vcpkg" CACHE PATH "Path to vcpkg root")
@@ -74,8 +77,31 @@ set(CMAKE_FIND_PACKAGE_PREFER_CONFIG ON)
 
 
 # 找到Qt库
-find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets)
-find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets)
+# --- Begin Qt selection block applied by GitHub Copilot ---
+option(USE_QT6 "Prefer Qt6 if available, otherwise fall back to Qt5" ON)
+
+if(USE_QT6)
+    find_package(Qt6 COMPONENTS Widgets QUIET)
+    if(Qt6_FOUND)
+        message(STATUS "Using Qt6")
+        set(QT_VERSION_MAJOR 6)
+    else()
+        message(STATUS "Qt6 not found; falling back to Qt5")
+        find_package(Qt5 REQUIRED COMPONENTS Widgets)
+        set(QT_VERSION_MAJOR 5)
+    endif()
+else()
+    find_package(Qt5 COMPONENTS Widgets QUIET)
+    if(Qt5_FOUND)
+        message(STATUS "Using Qt5")
+        set(QT_VERSION_MAJOR 5)
+    else()
+        message(STATUS "Qt5 not found; falling back to Qt6")
+        find_package(Qt6 REQUIRED COMPONENTS Widgets)
+        set(QT_VERSION_MAJOR 6)
+    endif()
+endif()
+# --- End Qt selection block ---
 
 # remove previous set_directory_properties usage; set USING_SDL3 based on detection
 if(USING_SDL3)
