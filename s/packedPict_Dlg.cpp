@@ -184,13 +184,16 @@ void PackedPict_Dlg::drawAllMap()
 	m_ImageLabel.setPixmap(image);
 	//小窗口
 	if (m_Type != 3)
-		m_MiniMapLable.setPixmap(QPixmap::fromImage(m_Map).scaled(256,256));
+		m_MiniMapLable.setPixmap(QPixmap::fromImage(m_Map));
 	else
 	{
 		if (!m_itemCount) m_itemCount = 1;
 		int i = (m_Times >> 3) % m_itemCount;
-		QPixmap m(256, 256);
-		imageCopy(m, QRect(0, 0, 256, 256), m_Map, QRect((i % m_colCount) * m_ItemW, (i / m_colCount) * m_ItemH, m_ItemW, m_ItemH));
+		QPixmap m(m_MiniMapLable.width(), m_MiniMapLable.height());
+		//在小窗口绘制当前帧
+		imageCopy(m, QRect(0, 0, m_MiniMapLable.width(), m_MiniMapLable.height()), 
+			m_Map, QRect((i % m_colCount) * m_ItemW,
+			(i / m_colCount) * m_ItemH, m_ItemW, m_ItemH));
 		m_MiniMapLable.setPixmap(m);
 	}
 	return;
@@ -708,10 +711,10 @@ void PackedPict_Dlg::init()
 	m_ListModel = new CViewModel;
 	m_ListModel->set_t_Data(&s_Data);
 	m_List->setModel(m_ListModel);
-	m_List->setColumnWidth(0, 60);
-	m_List->setColumnWidth(1, 100);
+	m_List->setColumnWidth(0, 50);
+	m_List->setColumnWidth(1, 60);
 	if (m_Type == 3)
-		m_List->setColumnWidth(2, 60);
+		m_List->setColumnWidth(2, 50);
 	m_List->setCurrentIndex(m_ListModel->index(m_ListSelectRow, 0));
 
 	QObject::connect(m_List->selectionModel(), &QItemSelectionModel::selectionChanged,

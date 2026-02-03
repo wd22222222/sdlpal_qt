@@ -57,6 +57,7 @@ public:
     static CGetPalData* pal() { return m_Pal; }
 protected:
     virtual void resizeEvent(QResizeEvent* event) override;
+    void setupLayout();
     virtual void closeEvent(QCloseEvent* event)override;
 private:
 

@@ -12,6 +12,7 @@
 
 #ifdef _WIN32
 #include <windows.h>
+//#include <qtenvironmentvariables.h>
 #if _DEBUG
 //#include <io.h>
 void CreateDebugConsole() {
@@ -35,10 +36,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 {
 	auto argc = __argc;
 	auto argv = __argv;
+#if QT_VERSION >= QT_VERSION_CHECK(5, 6, 0)
+	// 启用 High DPI 支持（Qt5 需要，Qt6 默认开启但显式写更安全）
+	QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+	QApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
+#endif
+
 	CreateDebugConsole();
 	printf("这是调试信息\n");
 	std::cout << "C++流输出" << std::endl;
 #else
+
 int main(int argc, char* argv[])
 {
 #endif

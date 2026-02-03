@@ -25,9 +25,33 @@
 #include <qevent.h>
 #include <qmessagebox.h>
 #include "CPixEdit.h"
-#include "cviewmodel.h"
+#include <Windows.h>
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
+#include <qcontainerfwd.h>
+#include <qnamespace.h>
+#include <qpoint.h>
+#include <qrect.h>
+#if QT_VERSION >= QT_VERSION_CHECK( 6,0, 0)
+#include <qtmetamacros.h>
+#include <qtversionchecks.h>
+#endif
+#include <qimage.h>
+#include <qkeysequence.h>
+#include <qpalette.h>
+#include <qpen.h>
+#include <qpixmap.h>
+#include <qrgb.h>
+#include <qabstractitemview.h>
+#include <qdialog.h>
+#include <qtableview.h>
+#include <qwidget.h>
+#include <main/palgpgl.h>
+#include <main/palsurface.h>
+#include "cgetpaldata.h"
+#include <qpainter.h>
 
-using namespace std;
 //选中的行始终保持高亮
 void CPixEdit::setSelectKeepHighlighted(QTableView* table)
 {
@@ -35,6 +59,105 @@ void CPixEdit::setSelectKeepHighlighted(QTableView* table)
     p.setColor(QPalette::Inactive, QPalette::Highlight, p.color(QPalette::Active, QPalette::Highlight));
     p.setColor(QPalette::Inactive, QPalette::HighlightedText, p.color(QPalette::Active, QPalette::HighlightedText));
     table->setPalette(p);
+}
+
+//图形拷贝
+void CPixEdit::imageCopy(QImage& dst, const QRect& dRect, const QImage& src, const QRect& sRect)
+{
+    QPainter p(&dst);
+    p.drawImage(dRect, src, sRect);
+}
+
+void CPixEdit::imageCopy(QPixmap& dst, const QRect& dRect, const QImage& src, const QRect& sRect)
+{
+    QPainter p(&dst);
+    p.drawImage(dRect, src, sRect);
+}
+
+void CPixEdit::imageCopy(QPixmap& dst, const QRect& dRect, const QPixmap& src, const QRect& sRect)
+{
+    QPainter p(&dst);
+    p.drawPixmap(dRect, src, sRect);
+}
+
+//坐标转换，原图片转显示
+PalQRect CPixEdit::imageToLabelRect(const PAL_Rect& r, const QPoint& m, const double zoom)
+{
+    PalQRect s = r; s.x -= m.x(); s.y -= m.y(); s *= (1 / (zoom)+0.00001);
+    return s;
+}
+
+PAL_Rect CPixEdit::imageToLabelRect(const QRect& r, const QPoint& m, const double zoom)
+{
+    return imageToLabelRect(PAL_Rect(r.x(), r.y(), r.width(), r.height()), m, zoom);
+}
+
+//坐标转换，显示转图片
+PalQRect CPixEdit::labelRectToImage(const PalQRect& r, const QPoint& m, double zoom)
+{
+    PalQRect s = r; s *= (zoom + 0.000001); s.x += m.x(); s.y += m.y();
+    return s;
+}
+
+// 画菱型Drawing rhomb shape
+// 画菱形图块的边界，菱形起点为矩形的边界线段中点
+//输入：图像结构指针，矩形宽度，矩形高度，线颜色=白色，线宽度=1
+//返回，0 失败，非零成功
+BOOL CPixEdit::DrawingRhombShape(QImage& image, int w, int h, int x, int y, QRgb r, int width)
+{
+    // TODO: 在此处添加实现代码.+
+    if (image.isNull())return 0;
+    QPainter  painter(&image);
+    QPoint s[4] = { { x,y + (h >> 1) },{ x + (w >> 1),y },{ x + w ,y + (h >> 1) },{ x + (w >> 1),y + h } };
+    QPen pen;
+    // 设置画笔的颜色
+    pen.setColor(r);
+    // 设置线的宽度
+    pen.setWidth(width);
+    painter.setPen(pen);
+    // 画线 (起点坐标、终点坐标)
+    for (int n = 0; n < 3; n++)
+        painter.drawLine(s[n], s[n + 1]);
+    painter.drawLine(s[3], s[0]);
+    return 1;
+}
+
+BOOL CPixEdit::DrawingRhombShape(QPixmap* image, int w, int h, int x, int y, QRgb r, int width)
+{
+    if (!image)return 0;
+    QPoint s[4] = { { x,y + (h >> 1) },{ x + (w >> 1),y },{ x + w ,y + (h >> 1) },{ x + (w >> 1),y + h } };
+    QPainter  painter(image);
+    QPen pen;
+    // 设置画笔的颜色
+    pen.setColor(r);
+    // 设置线的宽度
+    pen.setWidth(width);
+    painter.setPen(pen);
+    // 画线 (起点坐标、终点坐标)
+    for (int n = 0; n < 3; n++)
+        painter.drawLine(s[n], s[n + 1]);
+    painter.drawLine(s[3], s[0]);
+    return 1;
+}
+
+//画矩形
+BOOL CPixEdit::DrawSquare(QImage* image, int w, int h, int x, int y, QRgb r, int width)
+{
+    // TODO: 在此处添加实现代码.+
+    if (!image)return 0;
+    QPoint s[4] = { { x,y },{ x + w,y },{ x + w ,y + h },{ x ,y + h } };
+    QPainter  painter(image);
+    QPen pen;
+    // 设置画笔的颜色
+    pen.setColor(r);
+    // 设置线的宽度
+    pen.setWidth(width);
+    painter.setPen(pen);
+    // 画线 (起点坐标、终点坐标)
+    for (int n = 0; n < 3; n++)
+        painter.drawLine(s[n], s[n + 1]);
+    painter.drawLine(s[3], s[0]);
+    return 1;
 }
 
 void CPixEdit::keyPressEvent(QKeyEvent* event)
@@ -56,18 +179,18 @@ void CPixEdit::resizeEvent(QResizeEvent* event)
     int cy = event->size().height();
     if (!m_List)
         return;
-    m_List->resize(256, cy - 260);
+    m_List->resize(180, cy - 190);
     m_List->move(4, 4);
     m_vScrollBar->resize(20, cy - 60);
     m_vScrollBar->move(cx - 30, 4);
-    m_hScrollBar->resize(cx - 266 - 30, 20);
+    m_hScrollBar->resize(cx - 190 - 30, 20);
     m_hScrollBar->move(266, cy - 60);
-    m_MiniMapLable.resize(256, 256);
-    m_MiniMapLable.move(4, cy - 260);
-    m_tEdit.resize(cx - 270, 40);
-    m_tEdit.move(270, cy - 42);
-    m_ImageLabel.resize(cx - 266 - 30, cy - 43 - 25);
-    m_ImageLabel.move(266, 4);
+    m_MiniMapLable.resize(186, 186);
+    m_MiniMapLable.move(4, cy - 190);
+    m_tEdit.resize(cx - 190, 40);
+    m_tEdit.move(19, cy - 42);
+    m_ImageLabel.resize(cx - 190 - 30, cy - 43 - 25);
+    m_ImageLabel.move(190, 4);
 
 }
 
@@ -134,6 +257,26 @@ void CPixEdit::scrollValueChanged(int velue, int flags)
 }
 
 
+
+//画矩形
+BOOL CPixEdit::DrawSquare(QPixmap* image, int w, int h, int x, int y, QRgb r, int width)
+{
+    if (!image)return 0;
+    QPoint s[4] = { { x,y },{ x + w,y },{ x + w ,y + h },{ x ,y + h } };
+    QPainter  painter(image);
+    QPen pen;
+    // 设置画笔的颜色
+    pen.setColor(r);
+    // 设置线的宽度
+    pen.setWidth(width);
+    painter.setPen(pen);
+    // 画线 (起点坐标、终点坐标)
+    for (int n = 0; n < 3; n++)
+        painter.drawLine(s[n], s[n + 1]);
+    painter.drawLine(s[3], s[0]);
+    return 1;
+}
+
 void CPixEdit::mousePressEvent(QMouseEvent* event) {
     // 如果是左键点击，发射自定义的 clicked 信号
     QPoint pos;
@@ -153,7 +296,47 @@ void CPixEdit::mousePressEvent(QMouseEvent* event) {
     QWidget::mousePressEvent(event);
 }
 
+//取tile的坐标
+//输入：x,y,h 指向坐标的指针
+// 返回 1 成功，0 失败
+BOOL CPixEdit::GetMapTilePoint(int x, int y, int h, int& dx, int& dy)
+{
+    if (x > 64 || y > 128 || h > 1)
+        return FALSE;
+    dy = y * 16 - 8 + h * 8;
+    dx = x * 32 - 16 + h * 16;
+    return TRUE;
+}
 
+
+
+
+//通过点击的点，计算显示范围和位置
+//求dx,dy的title坐标 x,y，h
+DWORD CPixEdit::FindTileCoor(int dx, int dy, int& sx, int& sy, int& sh)
+{
+    //dx,dy 除 32 和 16
+    int x = (dx + 16) >> 5;
+    int y = (dy + 8) >> 4;
+    int h = 0;
+    int bx = (dx + 16) & 0x1f;
+    int by = (dy + 8) & 0xf;
+    if (bx < -2 * by + 16)
+        x--, y--, h = 1;
+    else if (bx < 2 * by - 16)
+        x--, h = 1;
+    else if (bx > 2 * by + 16)
+        y--, h = 1;
+    else if (bx > -2 * by + 48)
+        h = 1;
+    if (sx && sy && sh)
+        sy = y, sx = x, sh = h;
+    if (x >= 0 && y >= 0)
+    {
+        return m_Pal->m_pPalMap->MapTiles[y][x][h];
+    }
+    return 0;
+}
 
 //将图片上的区域范围显示出来 p 原点，sWidth sHeight 周边范围,返回需要显示的范围
 PalQRect CPixEdit::ImagePointToDraw(DWORD p,int sWidth ,int sHeight)
@@ -185,8 +368,8 @@ void CPixEdit::moveDotToMiddle(DWORD p)
     QPoint bPoint = labelPosToImage(QPoint(ax, ay), m_RightTopPos, m_MapZoom) - QPoint(dx, dy);//计算屏幕位置在表上的投影
     int  x = m_hScrollBar->value() - 1.0 / (MapPixWidth - m_ImageLabel.geometry().width() * m_MapZoom ) * (bPoint.x()) * MaxScrollValue;//计算滚动条位置
     int  y = m_vScrollBar->value() - 1.0 / (MapPixHight - m_ImageLabel.geometry().height() * m_MapZoom ) * (bPoint.y()) * MaxScrollValue ;
-    x = max(0, x); x = min(x, MaxScrollValue);
-    y = max(0, y); y = min(y, MaxScrollValue);
+    x = std::max(0, x); x = std::min(x, MaxScrollValue);
+    y = std::max(0, y); y = std::min(y, MaxScrollValue);
     m_hScrollBar->setValue(x);//移动滚动条
     m_vScrollBar->setValue(y);
     return;
@@ -225,26 +408,25 @@ void CPixEdit::mouseMoveEvent(QMouseEvent* event)
 //画障碍
 VOID CPixEdit::DrawObstacles(QImage& m, const PAL_Rect* lpSrcRect)
 {
-    int              sx, sy, dx, dy, x, y, h, xPos, yPos;
     //
     // Convert the coordinate
     //
-    sy = lpSrcRect->y / 16 - 1;
-    dy = (lpSrcRect->y + lpSrcRect->h) / 16 + 2;
-    sx = lpSrcRect->x / 32 - 1;
-    dx = (lpSrcRect->x + lpSrcRect->w) / 32 + 2;
-    yPos = sy * 16 - 8 - lpSrcRect->y;
-    for (y = sy; y < dy; y++)
+    int sy = lpSrcRect->y / 16 - 1;
+    int dy = (lpSrcRect->y + lpSrcRect->h) / 16 + 2;
+    int sx = lpSrcRect->x / 32 - 1;
+    int dx = (lpSrcRect->x + lpSrcRect->w) / 32 + 2;
+    int yPos = sy * 16 - 8 - lpSrcRect->y;
+    for (int y = sy; y < dy; y++)
     {
-        for (h = 0; h < 2; h++, yPos += 8)
+        for (int h = 0; h < 2; h++, yPos += 8)
         {
-            xPos = sx * 32 + h * 16 - 16 - lpSrcRect->x;
-            for (x = sx; x < dx; x++, xPos += 32)
+            int xPos = sx * 32 + h * 16 - 16 - lpSrcRect->x;
+            for (int x = sx; x < dx; x++, xPos += 32)
             {
                 //
                 if (x >= 64 || y >= 128 || h > 1 || x < 0 || y < 0)
                     continue;
-                DWORD32 l = m_Pal->m_pPalMap->MapTiles[y][x][h];
+                uint32_t l = m_Pal->m_pPalMap->MapTiles[y][x][h];
                 if (l & 0x2000)
                 {
                     //用白笔画
@@ -262,7 +444,7 @@ CPixEdit::CPixEdit(QWidget* parent)
     m_List->setSelectionMode(QAbstractItemView::SingleSelection);//单选
     m_List->setEditTriggers(QAbstractItemView::NoEditTriggers);//禁止编辑 
     m_List->setSelectionBehavior(QAbstractItemView::SelectRows);//选择行
-    m_List->verticalHeader()->setVisible(false);//显示表头
+    m_List->verticalHeader()->setVisible(false);//不显示表头
 
     //设置表头选中行关联色,失去焦点选择保持高亮
     setSelectKeepHighlighted(m_List);

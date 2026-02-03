@@ -24,6 +24,9 @@
 #include "main/Convers.h"
 #include <qdir.h>
 #include <qfiledialog.h>
+#include <qdialog.h>
+#include <qmessagebox.h>
+#include <qpushbutton.h>
 std::string  p_Script(int i)
 {
 	//返回脚本说明
@@ -565,29 +568,39 @@ CGetPalData::~CGetPalData() {
 
 
 
-// 封装显示中文消息框的函数，返回值为按钮位置  0 ，1，2 ……
-int CGetPalData::showChineseMessageBox(QWidget* parent, const QString& title, const QString& text, QMessageBox::Icon icon, const QStringList& buttons)
+int CGetPalData::showChineseMessageBox(QWidget* parent, const QString& title,
+	const QString& text, QMessageBox::Icon icon, const QStringList& buttons)
 {
 	QMessageBox msgBox(parent);
 	msgBox.setWindowTitle(title);
 	msgBox.setText(text);
 	msgBox.setIcon(icon);
 
-	if (buttons.isEmpty()) {
-		// 默认确定、取消按钮
-		QPushButton* okButton = msgBox.addButton("确定", QMessageBox::YesRole);
-		QPushButton* cancelButton = msgBox.addButton("取消", QMessageBox::NoRole);
-		msgBox.setDefaultButton(okButton);
-	}
-	else {
-		for (const QString& buttonText : buttons) {
-			msgBox.addButton(buttonText, QMessageBox::ActionRole);
-		}
+	// 默认按钮
+	QStringList btnTexts = buttons.isEmpty() ? QStringList{ "确定", "取消" } : buttons;
+
+	QList<QAbstractButton*> addedButtons;
+	for (const QString& buttonText : btnTexts) {
+		// 使用 ActionRole，避免 ESC 自动绑定到某个按钮
+		QAbstractButton* button = msgBox.addButton(buttonText, QMessageBox::ActionRole);
+		addedButtons << button;
 	}
 
-	return msgBox.exec();
+	// 可选：显式设置默认按钮（第一个）
+	if (!addedButtons.isEmpty()) {
+		msgBox.setDefaultButton(static_cast<QPushButton*>(addedButtons.first()));
+	}
+
+	int result = msgBox.exec();
+
+	QAbstractButton* clicked = msgBox.clickedButton();
+	if (!clicked) {
+		// 用户按 ESC、点击关闭按钮、或以其他方式关闭
+		return -1;
+	}
+
+	return addedButtons.indexOf(clicked);
 }
-
 //返回是否有修改数据
 bool CGetPalData::isSaveDataChaged() const {
 	for (int i = 0; i < modRoc_End; i++)
@@ -1257,8 +1270,8 @@ int CGetPalData::replaceMKFOne(ByteArray* f, int nNum, LPCVOID buf, int BufLen)
 {
 	if (f->empty() || !buf || nNum < 0)
 		return -1;
-	DWORD32 headlen = *(DWORD32*)f->data();
-	int count = headlen / sizeof(DWORD32) - 1;
+	uint32_t headlen = *(uint32_t*)f->data();
+	int count = headlen / sizeof(uint32_t) - 1;
 	ByteArray t;//临时缓存
 	int scOff = headlen;
 	if (nNum >= count)
@@ -1266,12 +1279,12 @@ int CGetPalData::replaceMKFOne(ByteArray* f, int nNum, LPCVOID buf, int BufLen)
 		//从尾部追加
 		nNum = count;
 		count++;
-		headlen += sizeof(DWORD32);
+		headlen += sizeof(uint32_t);
 	}
 
 	t.resize(f->size() + BufLen * 2 + 4);
 	memset(t.data(), 0, t.size());
-	DWORD32* sc = (DWORD32*)f->data(), * sd = (DWORD32*)t.data();//sc 源 sd 目标
+	uint32_t* sc = (uint32_t*)f->data(), * sd = (uint32_t*)t.data();//sc 源 sd 目标
 	int sdOff = sd[0] = headlen;//sdoff 目标偏移 ，scOff 源偏移
 	for (int i = 0; i < count; i++)
 	{

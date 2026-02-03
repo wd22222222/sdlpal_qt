@@ -9,23 +9,58 @@
 #include "mainwindow.h"
 #include "packedpict_dlg.h"
 #include <cassert>
-#include <qapplication.h>
+#include <map>
 #include <qdebug.h>
 #include <qdir.h>
 #include <qevent.h>
 #include <qfiledialog.h>
 #include <qmessagebox.h>
-#include <map>
-#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
-#include <QDesktopWidget>
-#else
-#include <QScreen>
+#include <qsplitter.h>
+
+#include "cpixedit.h"
+#include "ctableview.h"
+#include "t_data.h"
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <functional>
+#include <main/command.h>
+#include <main/cpaldata.h>
+#include <main/cpalevent.h>
+#include <main/cscript.h>
+#include <main/palgpgl.h>
+#include <qcontainerfwd.h>
+#include <qguiapplication.h>
+#include <qicon.h>
+#include <qlist.h>
+#include <qlogging.h>
+#include <qmainwindow.h>
+#include <qnamespace.h>
+#include <qrect.h>
+#include <qscreen.h>
+#include <qsizepolicy.h>
+#include <qstring.h>
+#include <qtextcursor.h>
+#include <qtextedit.h>
+#if QT_VERSION >= QT_VERSION_CHECK( 6,0, 0)
+#include <qtmetamacros.h>
+#include <qtpreprocessorsupport.h>
 #endif
+#include <qtreewidget.h>
+#include <qwidget.h>
+#include <string>
 #include <thread>
-using namespace std;
+#include <utility>
+#include <variant>
+#include <vector>
+#include <Windows.h>
+
+#if USING_OGG
+#include "ogg/ogg.h"
+#endif
 
 //下拉表筛选 0 物品 1 法术 2 毒药 3 攻击附加 4.怪
-const DWORD32 select_flag[] =
+constexpr uint32_t select_flag[] =
 {
     kIsItem,
     kIsMagic,
@@ -173,6 +208,7 @@ LPCSTR szsm[] =
     "亮度增强",
     "与BOSS战斗时 Q 键直接重新开始",//52
     "自动存档",
+    "更多的隐藏经验",
 };
 
 
@@ -251,26 +287,26 @@ VOID MainWindow::Edit_EventObject(int work)
     //参数 文字，列宽，列号，（类型 0 什么都不做，1，列头固定(永远显示)，2，Edit），
     //（原数据类型 0  整数 ，1 WORD, 2 SHORT, 3 16进制数，4 浮点数，5 字符串）
     //(下拉框数据索引)，（指向函数的指针，将源数据转化为显示数据字串），（指向函数的指针，将显示字串转化为源）
-    w_ColData[0].GetData("序号", 90, 1, ctrl_Fix, tWORD);
-    w_ColData[1].GetData("场景号", 90, 0, ctrl_Fix, tWORD);
-    w_ColData[2].GetData("隐时间", 90, 2, ctrl_Edit, tWORD);
-    w_ColData[3].GetData("X", 90, 3, ctrl_Edit, tWORD);
-    w_ColData[4].GetData("Y", 90, 4, ctrl_Edit, tWORD);
-    w_ColData[5].GetData("层次", 90, 5, ctrl_Edit, tSHORT);
-    w_ColData[6].GetData("目标脚本", 120, 6, ctrl_Edit, tHEX, 0, 0, 0, 1);
-    w_ColData[7].GetData("自动脚本", 120, 7, ctrl_Edit, tHEX, 0, 0, 0, 1);
-    w_ColData[8].GetData("状态", 90, 8, ctrl_Edit, tWORD);
-    w_ColData[9].GetData("触发模式", 90, 9, ctrl_Edit, tWORD);
-    w_ColData[10].GetData("形象号", 90, 10, ctrl_Edit, tWORD);
-    w_ColData[11].GetData("形象数", 90, 11, ctrl_Edit, tWORD);
-    w_ColData[12].GetData("方向", 90, 12, ctrl_Edit, tWORD);
-    w_ColData[13].GetData("当前帧数", 90, 13, ctrl_Edit, tSHORT);
-    w_ColData[14].GetData("空闲帧数", 90, 14, ctrl_Edit, tSHORT);
-    w_ColData[15].GetData("无效", 90, 15, ctrl_Edit, tSHORT);
-    w_ColData[16].GetData("总帧数", 90, 16, ctrl_Edit, tWORD);
-    w_ColData[17].GetData("空闲计数", 90, 17, ctrl_Edit, tWORD);
-    w_ColData[18].GetData("行号", 90, 18, ctrl_Null, tWORD);
-    w_ColData[19].GetData("原行号", 90, 19, ctrl_Null, tWORD);
+    w_ColData[0].GetData("序号", 40, 1, ctrl_Fix, tWORD);
+    w_ColData[1].GetData("场景号", 60, 0, ctrl_Fix, tWORD);
+    w_ColData[2].GetData("隐时间", 60, 2, ctrl_Edit, tWORD);
+    w_ColData[3].GetData("X", 60, 3, ctrl_Edit, tWORD);
+    w_ColData[4].GetData("Y", 60, 4, ctrl_Edit, tWORD);
+    w_ColData[5].GetData("层次", 60, 5, ctrl_Edit, tSHORT);
+    w_ColData[6].GetData("目标脚本", 80, 6, ctrl_Edit, tHEX, 0, 0, 0, 1);
+    w_ColData[7].GetData("自动脚本", 80, 7, ctrl_Edit, tHEX, 0, 0, 0, 1);
+    w_ColData[8].GetData("状态", 60, 8, ctrl_Edit, tWORD);
+    w_ColData[9].GetData("触发模式", 60, 9, ctrl_Edit, tWORD);
+    w_ColData[10].GetData("形象号", 60, 10, ctrl_Edit, tWORD);
+    w_ColData[11].GetData("形象数", 60, 11, ctrl_Edit, tWORD);
+    w_ColData[12].GetData("方向", 60, 12, ctrl_Edit, tWORD);
+    w_ColData[13].GetData("当前帧数", 60, 13, ctrl_Edit, tSHORT);
+    w_ColData[14].GetData("空闲帧数", 60, 14, ctrl_Edit, tSHORT);
+    w_ColData[15].GetData("无效", 60, 15, ctrl_Edit, tSHORT);
+    w_ColData[16].GetData("总帧数", 60, 16, ctrl_Edit, tWORD);
+    w_ColData[17].GetData("空闲计数", 60, 17, ctrl_Edit, tWORD);
+    w_ColData[18].GetData("行号", 60, 18, ctrl_Null, tWORD);
+    w_ColData[19].GetData("原行号", 50, 19, ctrl_Null, tWORD);
 
     //生成数据
     auto &s_RowData = s_Data.d_Array;
@@ -313,8 +349,8 @@ VOID MainWindow::Edit_EventObject(int work)
             s->ColVarList[18] = row + 1;
             s->ColVarList[19] = (int)s->oldRow;
         };
+    m_Grid->indexScene = 1;
     m_Grid->set_t_Data(s_Data); //
-
     return ;
 }
 //修改字库目录
@@ -327,7 +363,7 @@ void MainWindow::Edit_FontLibraryPath(int work)
         m_Pal->pal->ggConfig->m_FontName = a.selectedFontFile.toStdString();
         //确认,数据更新
         haveModified = 1;
-        //缺省数据
+        //存缺省数据
         m_Pal->saveGameDataToCache();
     };
 }
@@ -396,10 +432,10 @@ void MainWindow::Edit_Dialog(int swtch)
     T_DATA s_Data;
     ColArray &w_ColData = s_Data.c_Array;
     w_ColData.resize(4);
-    w_ColData[0].GetData("原序号", 90, 0, ctrl_Fix, tINT);
-    w_ColData[1].GetData("16进制", 90, 1, ctrl_Null, tHEX);
-    w_ColData[2].GetData("有效", 50, 1, ctrl_Null, tBOOL);
-    w_ColData[3].GetData("内容", 800, 1, ctrl_Edit, tSTR);
+    w_ColData[0].GetData("原序号", 50, 0, ctrl_Fix, tINT);
+    w_ColData[1].GetData("16进制", 50, 1, ctrl_Null, tHEX);
+    w_ColData[2].GetData("有效", 30, 1, ctrl_Null, tBOOL);
+    w_ColData[3].GetData("内容", 600, 1, ctrl_Edit, tSTR);
     //m_Grid.SetColClass(4, w_ColData);
 
     DataArray &s_RowData = s_Data.d_Array;
@@ -447,7 +483,7 @@ void MainWindow::Edit_Explain(int swtch)
     w_ColData.resize(3);
     w_ColData[0].GetData("对象号", 80, 0, ctrl_Fix, tINT);
     w_ColData[1].GetData("名称", 90, 1, ctrl_Fix, tINT, nullptr, p_SrcToStr);
-    w_ColData[2].GetData("说明", 900, 2, ctrl_Edit, tSTR);
+    w_ColData[2].GetData("说明", 600, 2, ctrl_Edit, tSTR);
 
     DataArray &s_RowData = s_Data.d_Array;
     s_RowData.resize(m_Pal->pal->gpGlobals->g_TextLib.nWords);
@@ -564,48 +600,48 @@ void MainWindow::Edit_Enemy(int swtch)
     auto& w_ColData = s_Data.c_Array;
     w_ColData.resize(totalCol);
     auto p_SrcToStr = std::bind(&MainWindow::q_SrcToStr, this, std::placeholders::_1);
-    w_ColData[0].GetData("ID", 60, 0, ctrl_Fix, tHEX);
-    w_ColData[1].GetData("名称", 120, 1, ctrl_Fix, tWORD, nullptr, p_SrcToStr);
-    w_ColData[2].GetData("空闲帧数", 90, 2, ctrl_Edit, tWORD);
-    w_ColData[3].GetData("魔法帧数", 90, 2, ctrl_Edit, tWORD);
-    w_ColData[4].GetData("普攻帧数", 90, 2, ctrl_Edit, tWORD);
-    w_ColData[5].GetData("空闲动速", 90, 2, ctrl_Edit, tWORD);
-    w_ColData[6].GetData("等待帧数", 90, 2, ctrl_Edit, tWORD);
-    w_ColData[7].GetData("Y位移", 90, 2, ctrl_Edit, tSHORT);
-    w_ColData[8].GetData("物攻声", 90, 2, ctrl_Edit, tWORD);
-    w_ColData[9].GetData("动作声", 90, 2, ctrl_Edit, tWORD);
-    w_ColData[10].GetData("魔法声", 90, 2, ctrl_Edit, tWORD);
-    w_ColData[11].GetData("死亡声", 90, 2, ctrl_Edit, tWORD);
-    w_ColData[12].GetData("进入声", 90, 2, ctrl_Edit, tWORD);
-    w_ColData[13].GetData("体力", 90, 2, ctrl_Edit, tWORD);
-    w_ColData[14].GetData("经验", 90, 3, ctrl_Edit, tWORD);
-    w_ColData[15].GetData("金钱", 90, 4, ctrl_Edit, tWORD);
-    w_ColData[16].GetData("等级", 90, 5, ctrl_Edit, tWORD);
-    w_ColData[17].GetData("魔法ID", 90, 6, ctrl_List, tNull, p_Select_Magic, p_SrcToStr);
-    w_ColData[18].GetData("概率", 90, 7, ctrl_Edit, tWORD);
-    w_ColData[19].GetData("攻击附加", 90, 8, ctrl_List, tNull, p_Select_All, p_SrcToStr);
-    w_ColData[20].GetData("概率", 90, 9, ctrl_Edit, tWORD);
-    w_ColData[21].GetData("偷窃物品", 90, 10, ctrl_List, tNull, p_Select_Item, p_SrcToStr);
-    w_ColData[22].GetData("数量", 90, 11, ctrl_Edit, tWORD);
-    w_ColData[23].GetData("物攻", 90, 12, ctrl_Edit, tSHORT);
-    w_ColData[24].GetData("灵攻", 90, 13, ctrl_Edit, tSHORT);
-    w_ColData[25].GetData("防御", 90, 14, ctrl_Edit, tSHORT);
-    w_ColData[26].GetData("速度", 90, 15, ctrl_Edit, tSHORT);
-    w_ColData[27].GetData("吉运", 90, 16, ctrl_Edit, tSHORT);
-    w_ColData[28].GetData("毒抗", 90, 17, ctrl_Edit, tWORD);
-    w_ColData[29].GetData("风抗", 90, 18, ctrl_Edit, tWORD);
-    w_ColData[30].GetData("雷抗", 90, 19, ctrl_Edit, tWORD);
-    w_ColData[31].GetData("水抗", 90, 20, ctrl_Edit, tWORD);
-    w_ColData[32].GetData("火抗", 90, 21, ctrl_Edit, tWORD);
-    w_ColData[33].GetData("土抗", 90, 22, ctrl_Edit, tWORD);
-    w_ColData[34].GetData("物抗", 90, 23, ctrl_Edit, tWORD);
-    w_ColData[35].GetData("双击", 90, 24, ctrl_Edit, tWORD);
-    w_ColData[36].GetData("灵葫值", 90, 25, ctrl_Edit, tWORD);
-    w_ColData[37].GetData("巫抗", 90, 26, ctrl_Edit, tWORD);
-    w_ColData[38].GetData("战前脚本", 90, 27, ctrl_Edit, tHEX, 0, 0, 0, 1);
-    w_ColData[39].GetData("战斗脚本", 90, 28, ctrl_Edit, tHEX, 0, 0, 0, 1);
-    w_ColData[40].GetData("战后脚本", 90, 29, ctrl_Edit, tHEX, 0, 0, 0, 1);
-    w_ColData[41].GetData("行号", 90, 30, ctrl_Null, tWORD);
+    w_ColData[0].GetData("ID", 40, 0, ctrl_Fix, tHEX);
+    w_ColData[1].GetData("名称", 90, 1, ctrl_Fix, tWORD, nullptr, p_SrcToStr);
+    w_ColData[2].GetData("空闲帧数", 60, 2, ctrl_Edit, tWORD);
+    w_ColData[3].GetData("魔法帧数", 60, 2, ctrl_Edit, tWORD);
+    w_ColData[4].GetData("普攻帧数", 60, 2, ctrl_Edit, tWORD);
+    w_ColData[5].GetData("空闲动速", 60, 2, ctrl_Edit, tWORD);
+    w_ColData[6].GetData("等待帧数", 60, 2, ctrl_Edit, tWORD);
+    w_ColData[7].GetData("Y位移", 60, 2, ctrl_Edit, tSHORT);
+    w_ColData[8].GetData("物攻声", 60, 2, ctrl_Edit, tWORD);
+    w_ColData[9].GetData("动作声", 60, 2, ctrl_Edit, tWORD);
+    w_ColData[10].GetData("魔法声", 60, 2, ctrl_Edit, tWORD);
+    w_ColData[11].GetData("死亡声", 60, 2, ctrl_Edit, tWORD);
+    w_ColData[12].GetData("进入声", 60, 2, ctrl_Edit, tWORD);
+    w_ColData[13].GetData("体力", 60, 2, ctrl_Edit, tWORD);
+    w_ColData[14].GetData("经验", 60, 3, ctrl_Edit, tWORD);
+    w_ColData[15].GetData("金钱", 60, 4, ctrl_Edit, tWORD);
+    w_ColData[16].GetData("等级", 60, 5, ctrl_Edit, tWORD);
+    w_ColData[17].GetData("魔法ID", 60, 6, ctrl_List, tNull, p_Select_Magic, p_SrcToStr);
+    w_ColData[18].GetData("概率", 60, 7, ctrl_Edit, tWORD);
+    w_ColData[19].GetData("攻击附加", 60, 8, ctrl_List, tNull, p_Select_All, p_SrcToStr);
+    w_ColData[20].GetData("概率", 60, 9, ctrl_Edit, tWORD);
+    w_ColData[21].GetData("偷窃物品", 60, 10, ctrl_List, tNull, p_Select_Item, p_SrcToStr);
+    w_ColData[22].GetData("数量", 60, 11, ctrl_Edit, tWORD);
+    w_ColData[23].GetData("物攻", 60, 12, ctrl_Edit, tSHORT);
+    w_ColData[24].GetData("灵攻", 60, 13, ctrl_Edit, tSHORT);
+    w_ColData[25].GetData("防御", 60, 14, ctrl_Edit, tSHORT);
+    w_ColData[26].GetData("速度", 60, 15, ctrl_Edit, tSHORT);
+    w_ColData[27].GetData("吉运", 60, 16, ctrl_Edit, tSHORT);
+    w_ColData[28].GetData("毒抗", 60, 17, ctrl_Edit, tWORD);
+    w_ColData[29].GetData("风抗", 60, 18, ctrl_Edit, tWORD);
+    w_ColData[30].GetData("雷抗", 60, 19, ctrl_Edit, tWORD);
+    w_ColData[31].GetData("水抗", 60, 20, ctrl_Edit, tWORD);
+    w_ColData[32].GetData("火抗", 60, 21, ctrl_Edit, tWORD);
+    w_ColData[33].GetData("土抗", 60, 22, ctrl_Edit, tWORD);
+    w_ColData[34].GetData("物抗", 60, 23, ctrl_Edit, tWORD);
+    w_ColData[35].GetData("双击", 60, 24, ctrl_Edit, tWORD);
+    w_ColData[36].GetData("灵葫值", 60, 25, ctrl_Edit, tWORD);
+    w_ColData[37].GetData("巫抗", 60, 26, ctrl_Edit, tWORD);
+    w_ColData[38].GetData("战前脚本", 60, 27, ctrl_Edit, tHEX, 0, 0, 0, 1);
+    w_ColData[39].GetData("战斗脚本", 60, 28, ctrl_Edit, tHEX, 0, 0, 0, 1);
+    w_ColData[40].GetData("战后脚本", 60, 29, ctrl_Edit, tHEX, 0, 0, 0, 1);
+    w_ColData[41].GetData("行号", 60, 30, ctrl_Null, tWORD);
 
     //m_Grid->SetColClass(42, w_ColData);
 
@@ -670,13 +706,13 @@ void MainWindow::Edit_EnemyTeam(int swtch)
     auto p_SrcToStr = std::bind(&MainWindow::q_SrcToStr, this, std::placeholders::_1);
     pSelect_Item p_Select_Enemy = &Select_Item_Array[4];//下拉表
 
-    w_ColData[0].GetData("队伍号", 100, 0, ctrl_Fix, tWORD);
-    w_ColData[1].GetData("位1名", 120, 1, ctrl_List, tNull, p_Select_Enemy, p_SrcToStr);
-    w_ColData[2].GetData("位2名", 120, 2, ctrl_List, tNull, p_Select_Enemy, p_SrcToStr);
-    w_ColData[3].GetData("位3名", 120, 3, ctrl_List, tNull, p_Select_Enemy, p_SrcToStr);
-    w_ColData[4].GetData("位4名", 120, 4, ctrl_List, tNull, p_Select_Enemy, p_SrcToStr);
-    w_ColData[5].GetData("位5名", 120, 5, ctrl_List, tNull, p_Select_Enemy, p_SrcToStr);
-	w_ColData[6].GetData("原队伍号", 100, 6, ctrl_Null, tWORD);
+    w_ColData[0].GetData("队伍号", 50, 0, ctrl_Fix, tWORD);
+    w_ColData[1].GetData("位1名", 60, 1, ctrl_List, tNull, p_Select_Enemy, p_SrcToStr);
+    w_ColData[2].GetData("位2名", 60, 2, ctrl_List, tNull, p_Select_Enemy, p_SrcToStr);
+    w_ColData[3].GetData("位3名", 60, 3, ctrl_List, tNull, p_Select_Enemy, p_SrcToStr);
+    w_ColData[4].GetData("位4名", 60, 4, ctrl_List, tNull, p_Select_Enemy, p_SrcToStr);
+    w_ColData[5].GetData("位5名", 60, 5, ctrl_List, tNull, p_Select_Enemy, p_SrcToStr);
+	w_ColData[6].GetData("原队伍号", 50, 6, ctrl_Null, tWORD);
     //生成数据
     DataArray  &s_RowData = s_Data.d_Array;
     auto p = &m_Pal->pal->gpGlobals->g;
@@ -711,7 +747,7 @@ void MainWindow::Edit_Magic(int swtch)
     WorkCtrl = WM_EDIT_MAGIC;
     m_Grid->UndoCtrl = WM_EDIT_MAGIC;
     QString msg("修改魔法");
-    SendMessages(msg);;
+    SendMessages(msg);
     //建立表头
     //参数 文字，列宽，列号，（类型 0 什么都不做，1，列头固定(永远显示)，2，Edit），
     //（原数据类型 0  整数 ，1 WORD, 2 SHORT, 3 16进制数，4 浮点数，5 字符串）
@@ -721,30 +757,30 @@ void MainWindow::Edit_Magic(int swtch)
     ColArray& w_ColData = s_Data.c_Array;
     auto p_SrcToStr = std::bind(&MainWindow::q_SrcToStr, this, std::placeholders::_1);
     w_ColData.resize(totalCol);
-    w_ColData[0].GetData("ID", 60, 0, ctrl_Fix, tHEX);
-    w_ColData[1].GetData("名称", 120, 1, ctrl_Fix, tWORD, nullptr, p_SrcToStr, nullptr);
-    w_ColData[2].GetData("形象号", 90, 2, ctrl_Edit, tSHORT);
-    w_ColData[3].GetData("类型", 90, 3, ctrl_Edit, tSHORT);
-    w_ColData[4].GetData("X位移", 90, 4, ctrl_Edit, tSHORT);
-    w_ColData[5].GetData("Y位移", 90, 5, ctrl_Edit, tSHORT);
-    w_ColData[6].GetData("效果号", 90, 6, ctrl_Edit, tSHORT);
-    w_ColData[7].GetData("速度", 90, 7, ctrl_Edit, tSHORT);
-    w_ColData[8].GetData("保持形象", 90, 8, ctrl_Edit, tSHORT);
-    w_ColData[9].GetData("声效延迟", 90, 9, ctrl_Edit, tSHORT);
-    w_ColData[10].GetData("耗时", 90, 10, ctrl_Edit, tSHORT);
-    w_ColData[11].GetData("场景震动", 90, 11, ctrl_Edit, tSHORT);
-    w_ColData[12].GetData("场景波动", 90, 12, ctrl_Edit, tSHORT);
-    w_ColData[13].GetData("保留", 90, 13, ctrl_Edit, tWORD);
-    w_ColData[14].GetData("耗兰", 90, 14, ctrl_Edit, tSHORT);
-    w_ColData[15].GetData("基础伤害", 90, 15, ctrl_Edit, tSHORT);
-    w_ColData[16].GetData("属性", 90, 16, ctrl_Edit, tSHORT);
-    w_ColData[17].GetData("声效", 90, 17, ctrl_Edit, tWORD);
-    w_ColData[18].GetData("标志", 90, 18, ctrl_Edit, tSHORT);
-    w_ColData[19].GetData("使用脚本", 90, 19, ctrl_Edit, tHEX, 0, 0, 0, 1);
-    w_ColData[20].GetData("成功脚本", 90, 20, ctrl_Edit, tHEX, 0, 0, 0, 1);
-    w_ColData[21].GetData("魔法号", 90, 21, ctrl_Null, tSHORT);
-    w_ColData[22].GetData("序号", 90, 22, ctrl_Null, tSHORT);
-    w_ColData[23].GetData("行号", 60, 23, ctrl_Null, tINT);
+    w_ColData[0].GetData("ID", 50, 0, ctrl_Fix, tHEX);
+    w_ColData[1].GetData("名称", 80, 1, ctrl_Fix, tWORD, nullptr, p_SrcToStr, nullptr);
+    w_ColData[2].GetData("形象号", 60, 2, ctrl_Edit, tSHORT);
+    w_ColData[3].GetData("类型", 60, 3, ctrl_Edit, tSHORT);
+    w_ColData[4].GetData("X位移", 60, 4, ctrl_Edit, tSHORT);
+    w_ColData[5].GetData("Y位移", 60, 5, ctrl_Edit, tSHORT);
+    w_ColData[6].GetData("效果号", 60, 6, ctrl_Edit, tSHORT);
+    w_ColData[7].GetData("速度", 60, 7, ctrl_Edit, tSHORT);
+    w_ColData[8].GetData("保持形象", 60, 8, ctrl_Edit, tSHORT);
+    w_ColData[9].GetData("声效延迟", 60, 9, ctrl_Edit, tSHORT);
+    w_ColData[10].GetData("耗时", 60, 10, ctrl_Edit, tSHORT);
+    w_ColData[11].GetData("场景震动", 60, 11, ctrl_Edit, tSHORT);
+    w_ColData[12].GetData("场景波动", 60, 12, ctrl_Edit, tSHORT);
+    w_ColData[13].GetData("保留", 60, 13, ctrl_Edit, tWORD);
+    w_ColData[14].GetData("耗兰", 60, 14, ctrl_Edit, tSHORT);
+    w_ColData[15].GetData("基础伤害", 60, 15, ctrl_Edit, tSHORT);
+    w_ColData[16].GetData("属性", 60, 16, ctrl_Edit, tSHORT);
+    w_ColData[17].GetData("声效", 60, 17, ctrl_Edit, tWORD);
+    w_ColData[18].GetData("标志", 60, 18, ctrl_Edit, tSHORT);
+    w_ColData[19].GetData("使用脚本", 60, 19, ctrl_Edit, tHEX, 0, 0, 0, 1);
+    w_ColData[20].GetData("成功脚本", 60, 20, ctrl_Edit, tHEX, 0, 0, 0, 1);
+    w_ColData[21].GetData("魔法号", 60, 21, ctrl_Null, tSHORT);
+    w_ColData[22].GetData("序号", 60, 22, ctrl_Null, tSHORT);
+    w_ColData[23].GetData("行号", 50, 23, ctrl_Null, tINT);
 
     //表数据
     DataArray& s_RowData = s_Data.d_Array;
@@ -814,43 +850,43 @@ void MainWindow::Edit_PlayerAttributes(int work)
     //参数 文字，列宽，列号，（类型 0 什么都不做，1，列头固定(永远显示)，2，Edit），
     //（原数据类型 0  整数 ，1 WORD, 2 SHORT, 3 16进制数，4 浮点数，5 字符串）
     //(下拉框数据索引)，（指向函数的指针，将源数据转化为显示数据字串），（指向函数的指针，将显示字串转化为源）
-    w_ColData[0].GetData("编号", 60, 0, ctrl_Fix, tWORD);
-    w_ColData[1].GetData("姓名", 120, 1, ctrl_Fix, tWORD, nullptr, p_SrcToStr);
-    w_ColData[2].GetData("等级", 90, 2, ctrl_Edit, tWORD);
-    w_ColData[3].GetData("体力MAX", 90, 3, ctrl_Edit, tWORD);
-    w_ColData[4].GetData("真气MAX", 90, 4, ctrl_Edit, tWORD);
-    w_ColData[5].GetData("体力", 90, 5, ctrl_Edit, tWORD);
-    w_ColData[6].GetData("真气", 90, 6, ctrl_Edit, tWORD);
-    w_ColData[7].GetData("武力", 90, 7, ctrl_Edit, tWORD);
-    w_ColData[8].GetData("灵气", 90, 8, ctrl_Edit, tWORD);
-    w_ColData[9].GetData("防御", 90, 9, ctrl_Edit, tWORD);
-    w_ColData[10].GetData("速度", 90, 10, ctrl_Edit, tWORD);
-    w_ColData[11].GetData("吉运", 90, 11, ctrl_Edit, tWORD);
-    w_ColData[12].GetData("毒抗", 90, 12, ctrl_Edit, tWORD);
-    w_ColData[13].GetData("风抗", 90, 13, ctrl_Edit, tWORD);
-    w_ColData[14].GetData("雷抗", 90, 14, ctrl_Edit, tWORD);
-    w_ColData[15].GetData("水抗", 90, 15, ctrl_Edit, tWORD);
-    w_ColData[16].GetData("火抗", 90, 16, ctrl_Edit, tWORD);
-    w_ColData[17].GetData("土抗", 90, 17, ctrl_Edit, tWORD);
-    w_ColData[18].GetData("巫抗", 90, 18, ctrl_Edit, tWORD);
-    w_ColData[19].GetData("物抗", 90, 19, ctrl_Edit, tWORD);
-    w_ColData[20].GetData("巫攻", 90, 20, ctrl_Edit, tWORD);
-    w_ColData[21].GetData("头", 120, 21, ctrl_List, tNull, p_Select_Item, p_SrcToStr);
-    w_ColData[22].GetData("肩", 120, 22, ctrl_List, tNull, p_Select_Item, p_SrcToStr);
-    w_ColData[23].GetData("身", 120, 23, ctrl_List, tNull, p_Select_Item, p_SrcToStr);
-    w_ColData[24].GetData("手", 120, 24, ctrl_List, tNull, p_Select_Item, p_SrcToStr);
-    w_ColData[25].GetData("脚", 120, 25, ctrl_List, tNull, p_Select_Item, p_SrcToStr);
-    w_ColData[26].GetData("挂", 120, 26, ctrl_List, tNull, p_Select_Item, p_SrcToStr);
-    w_ColData[27].GetData("救援", 120, 27, ctrl_Edit, tWORD);
-    w_ColData[28].GetData("合体法术", 120, 28, ctrl_List, tNull, p_Select_Magic, p_SrcToStr);
+    w_ColData[0].GetData("编号", 40, 0, ctrl_Fix, tWORD);
+    w_ColData[1].GetData("姓名", 80, 1, ctrl_Fix, tWORD, nullptr, p_SrcToStr);
+    w_ColData[2].GetData("等级", 60, 2, ctrl_Edit, tWORD);
+    w_ColData[3].GetData("体力MAX", 60, 3, ctrl_Edit, tWORD);
+    w_ColData[4].GetData("真气MAX", 60, 4, ctrl_Edit, tWORD);
+    w_ColData[5].GetData("体力", 60, 5, ctrl_Edit, tWORD);
+    w_ColData[6].GetData("真气", 60, 6, ctrl_Edit, tWORD);
+    w_ColData[7].GetData("武力", 60, 7, ctrl_Edit, tWORD);
+    w_ColData[8].GetData("灵气", 60, 8, ctrl_Edit, tWORD);
+    w_ColData[9].GetData("防御", 60, 9, ctrl_Edit, tWORD);
+    w_ColData[10].GetData("速度", 60, 10, ctrl_Edit, tWORD);
+    w_ColData[11].GetData("吉运", 60, 11, ctrl_Edit, tWORD);
+    w_ColData[12].GetData("毒抗", 60, 12, ctrl_Edit, tWORD);
+    w_ColData[13].GetData("风抗", 60, 13, ctrl_Edit, tWORD);
+    w_ColData[14].GetData("雷抗", 60, 14, ctrl_Edit, tWORD);
+    w_ColData[15].GetData("水抗", 60, 15, ctrl_Edit, tWORD);
+    w_ColData[16].GetData("火抗", 60, 16, ctrl_Edit, tWORD);
+    w_ColData[17].GetData("土抗", 60, 17, ctrl_Edit, tWORD);
+    w_ColData[18].GetData("巫抗", 60, 18, ctrl_Edit, tWORD);
+    w_ColData[19].GetData("物抗", 60, 19, ctrl_Edit, tWORD);
+    w_ColData[20].GetData("巫攻", 60, 20, ctrl_Edit, tWORD);
+    w_ColData[21].GetData("头", 90, 21, ctrl_List, tNull, p_Select_Item, p_SrcToStr);
+    w_ColData[22].GetData("肩", 90, 22, ctrl_List, tNull, p_Select_Item, p_SrcToStr);
+    w_ColData[23].GetData("身", 90, 23, ctrl_List, tNull, p_Select_Item, p_SrcToStr);
+    w_ColData[24].GetData("手", 90, 24, ctrl_List, tNull, p_Select_Item, p_SrcToStr);
+    w_ColData[25].GetData("脚", 90, 25, ctrl_List, tNull, p_Select_Item, p_SrcToStr);
+    w_ColData[26].GetData("挂", 90, 26, ctrl_List, tNull, p_Select_Item, p_SrcToStr);
+    w_ColData[27].GetData("救援", 90, 27, ctrl_Edit, tWORD);
+    w_ColData[28].GetData("合体法术", 90, 28, ctrl_List, tNull, p_Select_Magic, p_SrcToStr);
     for (WORD n = 29; n < 61; n++)
     {
-        w_ColData[n].GetData(m_Pal->pal->va("法术%2.2d", n - 28), 100, n, ctrl_List, tNull, p_Select_Magic, p_SrcToStr);
+        w_ColData[n].GetData(m_Pal->pal->va("法术%2.2d", n - 28), 60, n, ctrl_List, tNull, p_Select_Magic, p_SrcToStr);
     }
     //队友死 位2
-    w_ColData[61].GetData("队友死", 100, 61, ctrl_Edit, tHEX, 0, 0, 0, 1);//是脚本
+    w_ColData[61].GetData("队友死", 90, 61, ctrl_Edit, tHEX, 0, 0, 0, 1);//是脚本
     //濒死 位3
-    w_ColData[62].GetData("濒死", 100, 62, ctrl_Edit, tHEX, 0, 0, 0, 1);//是脚本
+    w_ColData[62].GetData("濒死", 90, 62, ctrl_Edit, tHEX, 0, 0, 0, 1);//是脚本
     //行号
     w_ColData[63].GetData("行号", 60, 63, ctrl_Null, tINT);
 
@@ -1223,7 +1259,7 @@ void MainWindow::Edit_Scene(int swtch)
     }
     m_Grid->set_t_Data(s_Data);
 	m_Grid->m_popMenuFlags = 0b10000001011;//支持在地图上部署第11位，
-	//m_Grid->m_popMenuFlags = 0b0001011; //不支持地图部署
+    m_Grid->indexScene = 0;
 }
 
 void MainWindow::Edit_Invenyory(int swtch)
@@ -1324,17 +1360,17 @@ void MainWindow::Edit_Store(int swtch)
     //参数 文字，列宽，列号，（类型 0 什么都不做，1，列头固定(永远显示)，2，Edit），
     //（原数据类型 0  整数 ，1 WORD, 2 SHORT, 3 16进制数，4 浮点数，5 字符串）
     //(下拉框数据索引)，（指向函数的指针，将源数据转化为显示数据字串），（指向函数的指针，将显示字串转化为源）
-    w_ColData[0].GetData("序号", 90, 0, ctrl_Fix, tWORD);
-    w_ColData[1].GetData("商店号", 90, 1, ctrl_Fix, tWORD, NULL, p_IntToStr);
-    w_ColData[2].GetData("位置1", 90, 2, ctrl_List, tNull, p_Select_all, p_SrcToStr);
-    w_ColData[3].GetData("位置2", 90, 3, ctrl_List, tNull, p_Select_all, p_SrcToStr);
-    w_ColData[4].GetData("位置3", 90, 4, ctrl_List, tNull, p_Select_all, p_SrcToStr);
-    w_ColData[5].GetData("位置4", 90, 5, ctrl_List, tNull, p_Select_all, p_SrcToStr);
-    w_ColData[6].GetData("位置5", 90, 6, ctrl_List, tNull, p_Select_all, p_SrcToStr);
-    w_ColData[7].GetData("位置6", 90, 7, ctrl_List, tNull, p_Select_all, p_SrcToStr);
-    w_ColData[8].GetData("位置7", 90, 8, ctrl_List, tNull, p_Select_all, p_SrcToStr);
-    w_ColData[9].GetData("位置8", 90, 9, ctrl_List, tNull, p_Select_all, p_SrcToStr);
-    w_ColData[10].GetData("位置9", 90, 10, ctrl_List, tNull, p_Select_all, p_SrcToStr);
+    w_ColData[0].GetData("序号", 40, 0, ctrl_Fix, tWORD);
+    w_ColData[1].GetData("商店号", 50, 1, ctrl_Fix, tWORD, NULL, p_IntToStr);
+    w_ColData[2].GetData("位置1", 69, 2, ctrl_List, tNull, p_Select_all, p_SrcToStr);
+    w_ColData[3].GetData("位置2", 69, 3, ctrl_List, tNull, p_Select_all, p_SrcToStr);
+    w_ColData[4].GetData("位置3", 69, 4, ctrl_List, tNull, p_Select_all, p_SrcToStr);
+    w_ColData[5].GetData("位置4", 69, 5, ctrl_List, tNull, p_Select_all, p_SrcToStr);
+    w_ColData[6].GetData("位置5", 69, 6, ctrl_List, tNull, p_Select_all, p_SrcToStr);
+    w_ColData[7].GetData("位置6", 69, 7, ctrl_List, tNull, p_Select_all, p_SrcToStr);
+    w_ColData[8].GetData("位置7", 69, 8, ctrl_List, tNull, p_Select_all, p_SrcToStr);
+    w_ColData[9].GetData("位置8", 69, 9, ctrl_List, tNull, p_Select_all, p_SrcToStr);
+    w_ColData[10].GetData("位置9", 69, 10, ctrl_List, tNull, p_Select_all, p_SrcToStr);
 
     //表数据
     int n_Row, n_Item;
@@ -1391,7 +1427,8 @@ MainWindow::MainWindow(QWidget* parent)
     //初始化
     m_Tree->setColumnCount(1);
     m_Tree->setHeaderHidden(true);
-
+    //布局
+	setupLayout();
     Select_Item_Array.clear();
     Select_Item_Array.resize(10);
 
@@ -1434,14 +1471,14 @@ MainWindow::MainWindow(QWidget* parent)
     Set_Tree();
 
     //获取主屏幕分辨率
-#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
-    QRect screenRect = QApplication::desktop()->screenGeometry();
-#else
-    QScreen* primaryScreen = QApplication::primaryScreen();
-    QRect screenRect = primaryScreen->geometry();
-#endif
-    //初始窗口大小
-    resize(screenRect.width() * 0.75, screenRect.height() * 0.75);
+    QScreen* screen = QGuiApplication::primaryScreen();
+    if (screen) {
+        QRect logicalScreen = screen->geometry();
+        resize(logicalScreen.width() * 0.75, logicalScreen.height() * 0.75);
+    }
+    else {
+        resize(800, 600); // fallback
+    }
     
     connect(m_Tree, &QTreeWidget::itemClicked, this, &MainWindow::SelectTreeItem);//当tree选择变化时启用
     connect(this, &MainWindow::SendMessages, this, &MainWindow::ShowMessage);//向窗口发送文字信息
@@ -1539,24 +1576,50 @@ void MainWindow::Set_Tree(int muneNumber)
 
 void MainWindow::resizeEvent(QResizeEvent* event)
 {
-    int cx = event->size().width();
-    int cy = event->size().height();
-    if (!m_Tree)
-        return;
-    if (cx < 800 || cy < 600)
-    {
-        this->resize(event->oldSize().width(), event->oldSize().height());
-        return;
-    }
-    m_Tree->resize(250, cy - 20);
-    m_Tree->move(4, 4);
-    m_Tree->show();
-    m_Grid->resize(cx - 270, cy / 2 + 80);
-    m_Grid->move(260, 4);
-    m_Grid->show();
-    m_Edit->resize(cx - 270, cy / 2 - 100);
-    m_Edit->move(260, cy / 2 + 88);
-    m_Edit->show();
+    QMainWindow::resizeEvent(event); // 如果保留，只需调用基类}
+}
+
+// 在 MainWindow 的构造函数中（例如 setupUI() 或 initWidgets()）
+void MainWindow::setupLayout()
+{
+    // 创建左侧树控件容器（固定最小/最大宽度）
+    m_Tree->setMinimumWidth(180);
+    m_Tree->setMaximumWidth(180); // 固定宽度
+    m_Tree->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+
+    // 创建右侧上半部分（表格）
+    m_Grid->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+
+    // 创建右侧下半部分（编辑区）
+    m_Edit->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+
+    // 垂直分割器：用于右侧上下分割
+    QSplitter* rightSplitter = new QSplitter(Qt::Vertical, this);
+    rightSplitter->addWidget(m_Grid);
+    rightSplitter->addWidget(m_Edit);
+    rightSplitter->setHandleWidth(8); // 可选：调整分隔条粗细
+
+    // 水平分割器：左侧树 + 右侧垂直分割器
+    QSplitter* mainSplitter = new QSplitter(Qt::Horizontal, this);
+    mainSplitter->addWidget(m_Tree);
+    mainSplitter->addWidget(rightSplitter);
+    mainSplitter->setHandleWidth(8);
+
+    // 设置初始分割比例（可选）
+    // 例如：左侧占 250px，右侧占剩余；上下各占一半
+    //QList<int> mainSizes;
+    //mainSizes << 250 << width() - 250; // 初始值可动态计算
+    //mainSplitter->setSizes(mainSizes);
+
+    QList<int> rightSizes;
+    rightSizes << height() * 2 / 3 << height() / 3;
+    rightSplitter->setSizes(rightSizes);
+
+    // 设置为主窗口中心 widget
+    setCentralWidget(mainSplitter);
+
+    // 设置最小窗口尺寸（替代 resizeEvent 中的限制）
+    setMinimumSize(800, 600);
 }
 
 void MainWindow::closeEvent(QCloseEvent* event)
@@ -1577,6 +1640,7 @@ void MainWindow::closeEvent(QCloseEvent* event)
             m_Pal->saveGameDataToCache();
         }
     }//
+
     if(!m_Pal->isSaveDataChaged())
 	{
 		//没有修改数据，直接关闭
@@ -1589,7 +1653,7 @@ void MainWindow::closeEvent(QCloseEvent* event)
         QStringList buttons = { "是", "否", "取消" };
         int ret = CGetPalData::showChineseMessageBox(nullptr, "警告", s, QMessageBox::Warning, buttons);
 
-        if (ret == 2)
+        if (ret == 2 || ret == -1)
         {
             event->ignore();//忽略关闭信号，阻止窗体关闭
             return;
@@ -1607,8 +1671,8 @@ void MainWindow::ShowMessage(const QString& msg)
 {
     m_Edit->moveCursor(QTextCursor::End);
     QTextCursor cursor = m_Edit->textCursor();
-    cursor.deletePreviousChar();;
-    cursor.deletePreviousChar();;
+    cursor.deletePreviousChar();
+    cursor.deletePreviousChar();
     m_Edit->append(msg +"\n\n");
 }
 
@@ -1646,13 +1710,12 @@ void MainWindow::SelectTreeItem(QTreeWidgetItem* item)
         {
             //缺省数据
             m_Pal->pal->gpGlobals->PAL_LoadDefaultGame();
-            //m_Pal->saveGameDataToCache();
         }
     }
     haveModified = 0;
     //清除UNDO数据
     m_Grid->clear();
-
+    //m_Grid->show();
 
     switch (swtch)
     {
@@ -1678,6 +1741,7 @@ void MainWindow::SelectTreeItem(QTreeWidgetItem* item)
 
         haveModified = 0;
         m_Grid->clear();
+		//m_Grid->show();
         Set_Tree(0);
         break;
     }
@@ -2102,7 +2166,7 @@ void MainWindow::DataUpDate(int Work)
             }
             p.lprgBattleField[r].wScreenWave = 0xffff & get<int>(m_DataArray[r].ColVarList[6]);
         }
-        if (JobCtrl == 0)
+        if (JobCtrl <= 0)
             m_Pal->saveGameDataToCache();
         break;
     }
@@ -2165,25 +2229,26 @@ void MainWindow::DataUpDate(int Work)
                 case 0x0012://设置对象到相对于队伍的位置 参数1对象,参数2 X，参数3 Y
                 case 0x0013://设置对象到指定的位置 参数1对象, 参数2 X，参数3 Y
                 case 0x0016://设置对象的，方向和（ 手势），参数1对象不为0 ，参数2，方向，参数3，形象
-                case 0x0024://设置对象自动脚本地址，参数1 对象不等于0 参数2 地址
-                case 0x0025://设置对象触发脚本地址，参数1 对象不等于0 参数2 地址
+                case 0x0024://设置对象自动脚本地址，参数1对象不等于0 参数2 地址
+                case 0x0025://设置对象触发脚本地址，参数1对象不等于0 参数2 地址
                 case 0x0040://设置对象触发模式 如参数1对象 ！= 0 ，参数2 设置
-                case 0x0049://设置对象状态，参数1 对象 参数2 状态
-                case 0x006c://參數1 !=0，0xffff 對象  NPC走一步，参数2 X，参数3 Y
-                case 0x006f://将当前事件对象状态与·另一个事件对象同步,参数1，对象
+                case 0x0049://设置对象状态，参数1对象 参数2 状态
+                case 0x006c://參數1對象 !=0，0xffff NPC走一步，参数2 X，参数3 Y
+                case 0x006f://将当前事件对象状态与·另一个事件对象同步,参数1对象
                 case 0x007d://移动对象位置，参数1对象 参数2 X，参数3 Y
                 case 0x007e://设置对象的层，参数1对象，参数2
-                case 0x0081://跳过，如果没有面对对象，参数1 对象，参数2 改变触发方式，参数3地址
+                case 0x0081://跳过，如果没有面对对象，参数1对象，参数2 改变触发方式，参数3地址
                 case 0x0083://如果事件对象不在当前事件对象的指定区域，则跳过,参数1对象，参数3地址
-                case 0x0084://将玩家用作事件对象的物品放置到场景中,参数1,位置，，失败跳到参数3
+                case 0x0084://将玩家用作事件对象的物品放置到场景中,参数1对象 位置，，失败跳到参数3
                 case 0x0094://如果事件对象的状态是指定的，则跳转,参数1 对象，参数2 状态，参数3 地址
+                case 0x0098://设置跟随对象,参数1对象 >= 0 设置跟随，0 取消                   
                     p1 = &m_Pal->pal->gpGlobals->g.lprgScriptEntry[n].rgwOperand[0];
                     break;
                 case 0x009A://为多个对象设置状态，参数1 到参数2，设置为参数3
                     p1 = &m_Pal->pal->gpGlobals->g.lprgScriptEntry[n].rgwOperand[0];
                     p2 = &m_Pal->pal->gpGlobals->g.lprgScriptEntry[n].rgwOperand[1];
                     break;
-                case 0x0004:
+				case 0x0004://运行子脚本，参数1 脚本地址，参数2 对象
                     p2 = &m_Pal->pal->gpGlobals->g.lprgScriptEntry[n].rgwOperand[1];
                     break;
                 default:
@@ -2233,7 +2298,7 @@ void MainWindow::DataUpDate(int Work)
             m_Pal->saveGameDataToCache();
 
             //使用新旧行对照表更新存盘数据中的事件对象 全部数据
-            for (int n_save = 0; n_save < m_Pal->pal->gpGlobals->rgSaveData[n_save].size(); n_save++)
+            for (int n_save = 0; n_save < m_Pal->pal->gpGlobals->rgSaveData.size(); n_save++)
             {
                 auto& p = m_Pal->pal->gpGlobals->g;
                 if ((m_Pal->pal->gpGlobals->rgSaveData[n_save].size()) == 0)
@@ -2245,10 +2310,16 @@ void MainWindow::DataUpDate(int Work)
                 {
                     wIndex = p.rgScene[n_scene + 1].wEventObjectIndex;
                     while (wIndex > m_DataArray[wEventObject].oldRow)
+                    {
                         wEventObject++;
+                        if (wEventObject >= m_DataArray.size())
+                        {
+                            wEventObject--;
+                            break;
+                        }
+                    }
                     if (wIndex < m_DataArray[wEventObject].oldRow)
                         wEventObject--;
-                    //assert(m_Pal->pal->gpGlobals->g.rgScene[n_scene + 1].wEventObjectIndex == wEventObject + 1);
                     p.rgScene[n_scene + 1].wEventObjectIndex = wEventObject + 1;
                 }
                 //更新事件对象表
@@ -2553,7 +2624,7 @@ void MainWindow::DataUpDate(int Work)
     {
         auto &pData = m_Pal->pal->gpGlobals;
         //对话修改
-        qDebug() << "修改对话" << endl;
+        qDebug() << "修改对话" ;
         ByteArray tmpdata;
         std::vector<DWORD> tmpoff(nsize + 1);
         for (size_t r = 0; r < nsize ; r++)
@@ -2586,7 +2657,7 @@ void MainWindow::DataUpDate(int Work)
             sence->wEventObjectIndex = std::get<int>(m_DataArray[r].ColVarList[3]);
             sence->wMapNum = std::get<int>(m_DataArray[r].ColVarList[5]);
         }
-        if (JobCtrl == 0)
+        if (JobCtrl <= 0)
             m_Pal->saveGameDataToCache();
         break;
     }
@@ -2607,6 +2678,13 @@ void MainWindow::DataUpDate(int Work)
             m_Pal->pal->gpGlobals->rgInventory[j].wItem = wItem;
             m_Pal->pal->gpGlobals->rgInventory[j].nAmount = get<int>(m_DataArray[r].ColVarList[2]);
         }
+        //修改后的数据存到
+        if(JobCtrl )
+        {
+            int saveTime = *((WORD*)m_Pal->pal->gpGlobals->rgSaveData[JobCtrl - 1].data());
+            //存档文件数据
+            m_Pal->pal->gpGlobals->PAL_SaveGame(m_Pal->pal->gpGlobals->rgSaveData[JobCtrl - 1], saveTime);
+        }
         break;
     }
 
@@ -2617,10 +2695,13 @@ void MainWindow::DataUpDate(int Work)
             //修改游戏设置
             m_Pal->pal->ggConfig->m_Function_Set[r] = get<int>(m_DataArray[r].ColVarList[1]);
         }
-        if (m_Pal->pal->ggConfig->m_Function_Set[47]!= m_Pal->pal->gpGlobals->rgSaveData.size())
+        if (int k = ( m_Pal->pal->ggConfig->m_Function_Set[47] + m_Pal->pal->ggConfig->m_Function_Set[53])
+            != m_Pal->pal->gpGlobals->rgSaveData.size())
         {
-            m_Pal->pal->gpGlobals->rgSaveData.resize(m_Pal->pal->ggConfig->m_Function_Set[47]);
+            m_Pal->pal->gpGlobals->rgSaveData.resize(k);
         }
+        if (JobCtrl <= 0)
+            m_Pal->saveGameDataToCache();
         break;
     }
     case WM_EditFontLibraryPath:

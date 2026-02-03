@@ -20,31 +20,48 @@
 //
 
 #include "fontfinder.h"
-#include <QVBoxLayout>
-#include <QHBoxLayout>
-#include <QPushButton>
-#include <QFileDialog>
-#include <QDir>
-#include <QMessageBox>
-#include <QFontDatabase>
-#include <QDesktopServices>
-#include <QUrl>
-#include <QFileInfo>
-#include <QDateTime>
-#include <QHeaderView>
-#include <QFontMetrics>
-#include <QTreeWidgetItem>
-#include <QDebug>
-#include <QFile>
-#include <QByteArray>
+#include <qpushbutton.h>
+#include <qheaderview.h>
+#include <qscreen.h>
+#include <qdatetime.h>
 #include <qcheckbox.h>
-#include <QTextStream>
+#include <qboxlayout.h>
+#include <qfiledialog.h>
+#include <qfileinfo.h>
+#include <qfontinfo.h>
+#include <qfontdatabase.h>
+#include <qmap.h>
+#include <qvariant.h>
+#include <qtextedit.h>
+#include <qmessagebox.h>
+#include <qlistwidget.h>
+#include <qtreewidget.h>
+#include <QDesktopServices.h>
+#include <qsystemdetection.h>
+#include <qtextstream.h>
+#include <qfont.h>
+#include <qguiapplication.h>
+#include <qdialog.h>
+#include <qlabel.h>
+#include <qlineedit.h>
+#include <qwidget.h>
+#include <qchar.h>
+#include <qcontainerfwd.h>
+#include <qdir.h>
+#include <qfile.h>
+#if QT_VERSION >= QT_VERSION_CHECK( 6,0, 0)
+#include <qforeach.h>
+#endif
+#include <qiodevice.h>
+#include <qlist.h>
+#include <qnamespace.h>
+#include <qrect.h>
+#include <qstring.h>
 
 #ifdef Q_OS_WIN
 #include <windows.h>
-#include <sys/stat.h>
 #endif
-#include <qmainwindow.h>
+#include <qurl.h>
 
 // 字体名称ID定义
 #define NAME_ID_COPYRIGHT         0
@@ -73,7 +90,15 @@ FontFinder::FontFinder(const QString & fontPath, QWidget* parent) : QDialog(pare
     this->selectedFontFile = fontPath;
     setupUI();
     setWindowTitle("字体文件查找工具 - 带中文解释");
-    resize(1600, 900);
+    // 确保 main() 中已设置 AA_EnableHighDpiScaling（Qt5）
+    QScreen* screen = QGuiApplication::primaryScreen();
+    if (screen) {
+        QRect logicalScreen = screen->geometry();
+        resize(logicalScreen.width() * 0.75, logicalScreen.height() * 0.75);
+    }
+    else {
+        resize(800, 600); // fallback
+    }
     if(selectedFontFile.size())
         showFontProperties(selectedFontFile);
 }

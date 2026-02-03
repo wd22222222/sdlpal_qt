@@ -181,20 +181,20 @@ void CMapEdit::resizeEvent(QResizeEvent* event)
 
     if (!m_List)
         return;
-    m_List->resize(80, cy - 260);
+    m_List->resize(66, cy - 200);
     m_List->move(4, 4);
-    m_ImageList->resize(188, cy - 260);
-    m_ImageList->move(84, 4);
-    m_ImageLabel.resize(cx - 266 - 30, cy - 50 - 25);
-    m_ImageLabel.move(266, 4);
+    m_ImageList->resize(120, cy - 200);
+    m_ImageList->move(64, 4);
+    m_ImageLabel.resize(cx - 186 - 30, cy - 50 - 25);
+    m_ImageLabel.move(196, 4);
     m_vScrollBar->resize(20, cy - 60);
     m_vScrollBar->move(cx - 30, 4);
-    m_hScrollBar->resize(cx - 266 - 30, 20);
+    m_hScrollBar->resize(cx - 186 - 30, 20);
     m_hScrollBar->move(266, cy - 60);
-    m_MiniMapLable.resize(256, 256);
-    m_MiniMapLable.move(4, cy - 260);
-    m_tEdit.resize(cx - 270, 46);
-    m_tEdit.move(270, cy - 46);
+    m_MiniMapLable.resize(186, 176);
+    m_MiniMapLable.move(4, cy - 190);
+    m_tEdit.resize(cx - 190, 46);
+    m_tEdit.move(196, cy - 46);
     m_tEdit.show();
 }
 
@@ -214,7 +214,7 @@ void CMapEdit::init(int sMap)
         s_nMap = m_Pal->pal->gpGlobals->PAL_MKFGetChunkCount(fpMAP);
         ColArray& w_ColData = s_Data.c_Array;
         w_ColData.resize(1);
-        w_ColData[0].GetData("地图", 50, 0, ctrl_Null, tINT);
+        w_ColData[0].GetData("地图", 60, 0, ctrl_Null, tINT);
         m_List->setSelectionMode(QAbstractItemView::SingleSelection);//单选
         m_List->setEditTriggers(QAbstractItemView::NoEditTriggers);//禁止编辑 
         m_List->setSelectionBehavior(QAbstractItemView::SelectRows);//选择行
@@ -240,13 +240,11 @@ void CMapEdit::init(int sMap)
         m_List->setCurrentIndex(m_ListModel->index(0, 0));
         m_ListSelectRow = 0;
         //
-        //connect(m_List, &QTableView::clicked, this, &CMapEdit::mapListClicked);
         connect(m_List->selectionModel(), &QItemSelectionModel::currentChanged,
             this, [&](const QModelIndex& current, const QModelIndex& previous)->void {
                 if (!current.isValid())
                     return;
                 mapListClicked(current);
-                //qDebug() << current.row() ;
             });
 
         //connect(m_List,&QTableView::sele)
@@ -289,7 +287,7 @@ void CMapEdit::init(int sMap)
             if (!lpSprite)
                 return QPixmap();
             m_Pal->PAL_RLEBlitToSurface(lpSprite, m, 0);
-            qreal scaleFactor = 3.0; // 放大3倍
+            qreal scaleFactor = 2.0; // 放大3倍
             auto pix = QPixmap::fromImage(m);
             QBitmap mask(pix.size()); // 创建一个与原图片大小相同的位图掩码
             mask.fill(m_Pal->sdl_colorToUint( m_Pal->pal->gpPalette->colors[0])); //设置透明色 
@@ -370,7 +368,7 @@ void CMapEdit::drawAllMap()
     }
     m_ImageLabel.setPixmap((dstMap));
     PAL_Rect& r = sRect;
-    double miniZoom = 256.0 / m_Map.width();
+    double miniZoom = 1.0f * m_MiniMapLable.width() / m_Map.width();
     QPixmap mini = QPixmap::fromImage(m_Map).scaled(m_Map.size() * miniZoom, Qt::KeepAspectRatio);
     DrawSquare(&mini, (r.w * miniZoom), (r.h * miniZoom), r.x * miniZoom, r.y * miniZoom, qRgb(255, 255, 255), 2);
     m_MiniMapLable.setPixmap(mini);

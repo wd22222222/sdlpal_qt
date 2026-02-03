@@ -22,13 +22,13 @@
 #include <qheaderview.h>
 #include <qtableview.h>
 #include <qscrollbar.h>
-#include <qstandarditemmodel.h>
-#include <qdebug.h>
+#include <qmenu.h>
 #include <qpoint.h>
 #include <QInputDialog.h>
+#include <qobject.h>
 #include "ctableview.h"
 #include "CustomItemDelegrate.h"
-
+#include <qabstractslider.h>
 CTableView::CTableView(QWidget* parent)
 	:QTableView(parent)
 {
@@ -98,14 +98,15 @@ void CTableView::init()
 	setModel(m_Model);
 	s1->setModel(m_Model);
 	memset(&TableSize, 0, sizeof(TableSize));
-	//设置横表头
-	//	表头高度
-	s1->horizontalHeader()->setMinimumHeight(30);
-	horizontalHeader()->setMinimumHeight(30);
+	//设置水平表头
+	//表头最小高度
+	s1->horizontalHeader()->setMinimumHeight(40);
+	horizontalHeader()->setMinimumHeight(40);
 
 	//网格
 	s1->setShowGrid(true);
 	setShowGrid(true);
+	//表头样式
 	horizontalHeader()->setStyleSheet("QHeaderView::section{background-color:0xefefef}");
 	for (int i = 0; i < t_Data.c_Array.size(); i++)
 	{
@@ -118,8 +119,9 @@ void CTableView::init()
 			s1->setColumnHidden(i, TRUE);
 		TableSize.bw += t_Data.c_Array[i].ColWidth;//表宽
 		s1->setColumnWidth(i, t_Data.c_Array[i].ColWidth);
-		//添加表头数据
+		//添加表头数据,表头宽度
 		setColumnWidth(i, t_Data.c_Array[i].ColWidth);
+
 		//较验规则
 		QString s;
 		switch (t_Data.c_Array[i].DataStat)
@@ -174,6 +176,13 @@ void CTableView::resize(const int w, const int h)
 		s1->hide();
 	else
 		s1->show();
+}
+
+void CTableView::clear()
+{
+	setModel(nullptr); s1->setModel(nullptr);
+	t_Data.UndoCount = 0;
+	t_Data.u_Array.clear();
 }
 
 void CTableView::getEditCell(int row, int col) 
@@ -476,7 +485,7 @@ void CTableView::menuSelected(QAction* act)
 		//在地图上部署
 	{
 		auto row = IndexList[0].row();
-        int scene = std::get<int>(t_Data.d_Array[row].ColVarList[0]);
+        int scene = std::get<int>(t_Data.d_Array[row].ColVarList[indexScene]);
 		slots deployMap(scene);
 		break;
 	}

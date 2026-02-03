@@ -28,7 +28,7 @@
 #include "../main/cpaldata.h"
 #include "../main/cpalbaseio.h"
 #include <qinputdialog.h>
-
+#include <qmenu.h>
 static const char * pMenu_Str[] =
 {
 	"1.显示障碍",
@@ -205,7 +205,7 @@ void deployMap::drawAllMap()
 	m_ImageLabel.setPixmap((dstMap));
 	//小图
 	PAL_Rect& r = sRect;
-	double miniZoom = 256.0 / m_Map.width();
+	double miniZoom = 1.0f * m_MiniMapLable.width() / m_Map.width();
 	QPixmap mini = QPixmap::fromImage(m_Map).scaled(m_Map.size() * miniZoom, Qt::KeepAspectRatio);
 	DrawSquare(&mini, (r.w * miniZoom), (r.h * miniZoom), r.x * miniZoom, r.y * miniZoom, qRgb(255, 255, 255), 2);
 	m_MiniMapLable.setPixmap(mini);
@@ -342,7 +342,7 @@ void deployMap::makeALL()
 	m_ListModel->set_t_Data(&s_Data);
 	m_List->setModel(m_ListModel);
 	for (int i = 0; i < 4; i++)
-		m_List->setColumnWidth(i, i < 3 ? 70 : 74);;
+		m_List->setColumnWidth(i, i < 3 ? 56 : 62);;
 	m_List->setCurrentIndex(m_ListModel->index(0, 0));
 	//以下生成图
 	MakeMapImage(m_Map, m_Flags);
@@ -442,7 +442,7 @@ void deployMap::ClickedRightSlot(const QPoint pos)
 
 void deployMap::resizeEvent(QResizeEvent* event)
 {
-	constexpr int listSize = 300;
+	constexpr int listSize = 260;
 	QDialog::resizeEvent(event);
 	int cx = event->size().width();
 	int cy = event->size().height();

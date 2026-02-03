@@ -1,13 +1,11 @@
 ﻿#pragma once
+#include <qheaderview.h>
 #include <qtableview.h>
 #include "cviewmodel.h"
 #include "mainwindow.h"
 #include "cgetpaldata.h"
 #include <map>
-#include "..\main\command.h"
 #include "cviewmodel.h"
-
-//using namespace std;
 using  MAPScript = std::map<WORD, WORD>;
 
 std::string  p_Script(int i);

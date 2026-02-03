@@ -147,6 +147,7 @@ CConfig::CConfig()
     m_Function_Set[51] = 1;//亮度增强
 	m_Function_Set[52] = 0;//与BOSS战斗时 Q 键直接重新开始
     m_Function_Set[53] = 0;//自动存档
+    m_Function_Set[54] = 0;//更多的隐藏经验
 
     iAudioDevice = -1; //声音设备号
     iSurroundOPLOffset = 384;//围绕OPL抵消
