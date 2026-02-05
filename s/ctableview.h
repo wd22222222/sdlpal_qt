@@ -48,7 +48,12 @@ public:
     CTableView(QWidget* parent = (QWidget*)nullptr);
 	~CTableView();
 	void resize(const int w, const int h);
-	void clear();;
+	void clear() 
+	{
+		setModel(nullptr); s1->setModel(nullptr); hide();
+		t_Data.UndoCount = 0;
+		t_Data.u_Array.clear();
+	};
 	void getEditCell(int row, int col);
 	//选择指定栏，并滚动到
 	void setSelectItem(const int row = -1,const int col = -1,const int flage = 0);
