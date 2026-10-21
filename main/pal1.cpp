@@ -74,10 +74,6 @@ TerminateOnError(
     //PAL_Shutdown();
 }
 
-int CPalBase::pByteToInt(LPCBYTE p) {
-    return (int)(p[0] +
-        (p[1] << 8) + (p[2] << 16) + (p[3] << 24));
-}
 
 
 
@@ -95,7 +91,7 @@ INT CPalBase::PAL_MKFGetChunkCount(const ByteArray& fp)
     {
         return 0;
     }
-    return pByteToInt(fp.data()) / 4 - 1;
+    return CPalData::pByteToInt(fp.data()) / 4 - 1;
 }
 
 INT CPalBase::PAL_MKFReadChunk(
@@ -127,8 +123,8 @@ INT CPalBase::PAL_MKFReadChunk(
     //
     // Get the offset of the chunk.
     //
-    uiOffset = pByteToInt(fp.data()+ 4 * uiChunkNum);
-    uiNextOffset = pByteToInt(fp.data() + 4 * uiChunkNum + 4);
+    uiOffset = CPalData::pByteToInt(fp.data()+ 4 * uiChunkNum);
+    uiNextOffset = CPalData::pByteToInt(fp.data() + 4 * uiChunkNum + 4);
     uiOffset = SWAP32(uiOffset);
     uiNextOffset = SWAP32(uiNextOffset);
 
@@ -188,7 +184,6 @@ INT CPalBase::PAL_MKFGetDecompressedSize(
 
   --*/
 {
-    //auto& gConfig = gpGlobals->gConfig;
     DWORD         buf[2]{};
     if (fp.empty())
     {
@@ -209,26 +204,26 @@ INT CPalBase::PAL_MKFGetDecompressedSize(
     //
     //fseek(fp, 4 * uiChunkNum, SEEK_SET);
     //fread(&uiOffset, 4, 1, fp);
-    auto uiOffset = pByteToInt(fp.data() + 4 * uiChunkNum);
+    auto uiOffset = CPalData::pByteToInt(fp.data() + 4 * uiChunkNum);
     uiOffset = SWAP32(uiOffset);
-    auto uiLast = pByteToInt(fp.data() + 4 * (uiChunkNum + 1));
+    auto uiLast = CPalData::pByteToInt(fp.data() + 4 * (uiChunkNum + 1));
     uiLast = SWAP32(uiLast);
     if (uiOffset == uiLast)
         return 0;
-    assert(CConfig::fisUSEYJ1DeCompress != -1);
-    if (CConfig::fisUSEYJ1DeCompress == 0)
+    assert(cfgIsUSEYJ1DeCompress != -1);
+    if (cfgIsUSEYJ1DeCompress == 0)
     {
         //fread(buf, sizeof(DWORD), 1, fp);
         //再读取下一个
-        buf[0] = pByteToInt(fp.data() + uiOffset);
+        buf[0] = CPalData::pByteToInt(fp.data() + uiOffset);
         buf[0] = SWAP32(buf[0]);
 
         return (INT)buf[0];
     }
     else
     {
-        buf[0] = pByteToInt(fp.data() + uiOffset);
-        buf[1] = pByteToInt(fp.data() + uiOffset + 4);
+        buf[0] = CPalData::pByteToInt(fp.data() + uiOffset);
+        buf[1] = CPalData::pByteToInt(fp.data() + uiOffset + 4);
         buf[0] = SWAP32(buf[0]);
         buf[1] = SWAP32(buf[1]);
         //检测标识
@@ -273,7 +268,7 @@ ByteArray CPalBase::PAL_MKFDecompressChunk(UINT uiChunkNum, const ByteArray& fp)
     buf.resize(len);
     if (PAL_MKFDecompressChunk(buf.data(), len, uiChunkNum, fp) <= 0)
         return ByteArray();
-    return buf;
+    return std::move(buf);
 }
 
 
@@ -300,7 +295,7 @@ VOID CPalBase::UTIL_CloseFile(	FILE *fp )
 }
 
 
-std::string CPalBase::PAL_GetObjectDesc(LPOBJECTDESC   lpObjectDesc,	WORD  wObjectID)
+std::string CPalBase::PAL_GetObjectDesc(const OBJECTDESC & rgObjectDesc,	WORD  wObjectID)
 /*++
   Purpose:
 
@@ -308,7 +303,7 @@ std::string CPalBase::PAL_GetObjectDesc(LPOBJECTDESC   lpObjectDesc,	WORD  wObje
 
   Parameters:
 
-    [IN]  lpObjectDesc - the description data linked list.
+    [IN]  rgObjectDesc - the description data linked list.
 
     [IN]  wObjectID - the object ID.
 
@@ -319,9 +314,11 @@ std::string CPalBase::PAL_GetObjectDesc(LPOBJECTDESC   lpObjectDesc,	WORD  wObje
 
 --*/
 {
-    if (lpObjectDesc == NULL)
+    if (!rgObjectDesc.contains(wObjectID))
         return std::string();
-    return lpObjectDesc->p[wObjectID];
+    auto it = rgObjectDesc.find(wObjectID);
+
+    return it->second;
 }
 
 
@@ -405,8 +402,8 @@ INT CPalBase::PAL_RNGReadFrame(
     //fseek(fpRngMKF, 4 * uiRngNum, SEEK_SET);
     //fread(&uiOffset, sizeof(UINT), 1, fpRngMKF);
     //fread(&uiNextOffset, sizeof(UINT), 1, fpRngMKF);
-    uiOffset = pByteToInt(fp.data() + 4 * uiRngNum);
-    uiNextOffset = pByteToInt(fp.data() + 4 * uiRngNum + 4);
+    uiOffset = CPalData::pByteToInt(fp.data() + 4 * uiRngNum);
+    uiNextOffset = CPalData::pByteToInt(fp.data() + 4 * uiRngNum + 4);
     uiOffset = SWAP32(uiOffset);
     uiNextOffset = SWAP32(uiNextOffset);
 
@@ -423,7 +420,7 @@ INT CPalBase::PAL_RNGReadFrame(
     // Get the number of sub chunks.
     //
     //fread(&uiChunkCount, sizeof(UINT), 1, fpRngMKF);
-    uiChunkCount = pByteToInt(fp.data() + uiOffset);
+    uiChunkCount = CPalData::pByteToInt(fp.data() + uiOffset);
     uiChunkCount = (SWAP32(uiChunkCount) - 4) / 4;
     if (uiFrameNum >= uiChunkCount)
     {
@@ -436,8 +433,8 @@ INT CPalBase::PAL_RNGReadFrame(
     //fseek(fpRngMKF, uiOffset + 4 * uiFrameNum, SEEK_SET);
     //fread(&uiSubOffset, sizeof(UINT), 1, fpRngMKF);
     //fread(&uiNextOffset, sizeof(UINT), 1, fpRngMKF);
-    uiSubOffset = pByteToInt(fp.data() + uiOffset + 4 * uiFrameNum);
-    uiNextOffset = pByteToInt(fp.data() + uiOffset + 4 * uiFrameNum + 4);
+    uiSubOffset = CPalData::pByteToInt(fp.data() + uiOffset + 4 * uiFrameNum);
+    uiNextOffset = CPalData::pByteToInt(fp.data() + uiOffset + 4 * uiFrameNum + 4);
     uiSubOffset = SWAP32(uiSubOffset);
     uiNextOffset = SWAP32(uiNextOffset);
 

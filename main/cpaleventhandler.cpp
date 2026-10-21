@@ -31,8 +31,7 @@ void CPalEventHandler::handleEvents(SDL_Event* event)
 {
 	auto it = callbacks.find(event->type);
 	if (it != callbacks.end()) {
-		CPalEventHandler::EventCallback c = it->second;
-		c(event);
+		it->second(event);
 	}
 }
 

@@ -71,8 +71,7 @@ CListScriptCall::CListScriptCall(MainWindow* para, unsigned short scriptEntry)
 				cS = ("初始设定");
 				break;
 			default:
-				cS = QString::asprintf("%d.rpg", save - 
-					CPalEvent::ggConfig->m_Function_Set[53]);
+				cS = QString::asprintf("%d.rpg", save - cfgAutoSave);
 				break;
 			}
 			s_d[n].ColVarList.resize(4);

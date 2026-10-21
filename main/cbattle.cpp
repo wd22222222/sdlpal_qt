@@ -1,4 +1,6 @@
-﻿//
+﻿#include "cbattle.h"
+#include "cbattle.h"
+//
 // Copyright (c) 2009, Wei Mingzhi <whistler_wmz@users.sf.net>.
 // All rights reserved.
 //
@@ -46,8 +48,6 @@ BATTLERESULT CBattle::PAL_BattleMain(
   战斗结果。
   --*/
 {
-	int         i;
-	DWORD       dwTime;
 
 	VIDEO_BackupScreen(gpTextureReal);
 
@@ -90,7 +90,7 @@ BATTLERESULT CBattle::PAL_BattleMain(
 	//每个敌人都要运行战前脚本
 	PAL_BattleBackupStat();
 
-	for (i = 0; i <= g_Battle.wMaxEnemyIndex; i++)
+	for (int i = 0; i <= g_Battle.wMaxEnemyIndex; i++)
 	{
 		g_Battle.rgEnemy[i].wScriptOnTurnStart =
 			PAL_RunTriggerScript(g_Battle.rgEnemy[i].wScriptOnTurnStart, i);
@@ -100,7 +100,6 @@ BATTLERESULT CBattle::PAL_BattleMain(
 			break;
 		}
 	}
-	PAL_BattleDisplayStatChange();
 
 	if (g_Battle.BattleResult == kBattleResultPreBattle)
 	{
@@ -108,7 +107,7 @@ BATTLERESULT CBattle::PAL_BattleMain(
 	}
 
 
-	dwTime = SDL_GetTicks_New();
+	auto dwTime = SDL_GetTicks_New() + cfgBtlFrameMs;
 
 	PAL_ClearKeyAll();
 
@@ -122,8 +121,13 @@ BATTLERESULT CBattle::PAL_BattleMain(
 	// Run the main battle loop.
 	//循环运行战斗回合
 	g_Loop = 0;
-	if (ggConfig->m_Function_Set[12])//修改战后覆盖的脚本
+	if (cfgPostBtlScript)//修改战后覆盖的脚本
 		g_ScriptOnBattleEnd.clear();
+
+	//将时间计数初始为 0
+	m_TimeCount = 0;
+	//清空缩微图像列表
+	g_Battle.spriteList.clear();
 	while (!PalQuit)
 	{
 		ClearScreen();
@@ -149,15 +153,13 @@ BATTLERESULT CBattle::PAL_BattleMain(
 		//
 		// Set the time of the next frame.
 		//
-		dwTime = SDL_GetTicks_New() + ggConfig->m_Function_Set[23];//BATTLE_FRAME_TIME;
+		dwTime = SDL_GetTicks_New() + cfgBtlFrameMs;
 
 		//
 		// Run the main frame routine.
 		//
-
-
 		PAL_BattleStartFrame();
-
+		
 		//
 		// Update the screen.
 		//更新屏幕
@@ -168,11 +170,6 @@ BATTLERESULT CBattle::PAL_BattleMain(
 	// Return the battle result
 	//返回战斗结果
 	return g_Battle.BattleResult;
-}
-
-template<typename T, typename T1>
-void CBattle::Check_Hidden_Exp(T, T1, int lable)
-{
 }
 
 
@@ -249,7 +246,7 @@ VOID CBattle::PAL_BattleWon(
 
 		wLevel = gpGlobals->g.PlayerRoles.rgwLevel[w];
 //#ifdef STRENGTHEN_PLAYER //有特色的加强主角，灵儿初始五灵抗性20%，阿奴毒抗巫抗各30%，林月如额外恢复
-		if(ggConfig->m_Function_Set[19])
+		if(cfgHeroUniqueBuff)
 			switch (w)
 			{	//赵灵儿属性增强
 			case RoleID_ZhaoLingEr:
@@ -283,11 +280,13 @@ VOID CBattle::PAL_BattleWon(
 //#endif
 		dwExp = gpGlobals->Exp.rgPrimaryExp[w].wExp;
 
-#ifdef EDIT_EXP_CALCULATION
-		dwExp += g_Battle.rgPlayer[i].dwExpGained;
-#else
-		dwExp += g_Battle.iExpGained;
-#endif
+//#ifdef EDIT_EXP_CALCULATION
+		if (cfgExpFormula)
+			dwExp += g_Battle.rgPlayer[i].dwExpGained;
+		else
+			//#else
+			dwExp += g_Battle.iExpGained;
+//#endif
 
 		if (gpGlobals->g.PlayerRoles.rgwLevel[w] > MAX_LEVELS
 #if 0
@@ -304,11 +303,13 @@ VOID CBattle::PAL_BattleWon(
 		DWORD LevelUpExp = 0;
 		while(!PalQuit)
 		{
-#ifdef EDIT_EXP_CALCULATION
-			LevelUpExp = PAL_New_GetLevelUpExp(gpGlobals->g.PlayerRoles.rgwLevel[w]);
-#else
-			LevelUpExp = gpGlobals->g.rgLevelUpExp[min(MAX_LEVELS, gpGlobals->g.PlayerRoles.rgwLevel[w])];
-#endif
+//#ifdef EDIT_EXP_CALCULATION
+			if (cfgExpFormula)
+				LevelUpExp = PAL_New_GetLevelUpExp(gpGlobals->g.PlayerRoles.rgwLevel[w]);
+			else
+				//#else
+				LevelUpExp = gpGlobals->g.rgLevelUpExp[std::min((WORD) MAX_LEVELS, gpGlobals->g.PlayerRoles.rgwLevel[w])];
+//#endif
 			if (dwExp < LevelUpExp)
 			{
 				break;
@@ -469,13 +470,13 @@ VOID CBattle::PAL_BattleWon(
 
 		if (iTotalCount > 0)
 		{
-			if (ggConfig->m_Function_Set[21])//使用梦蛇后，各项属性增加
+			if (cfgDreamSnakeUp)//使用梦蛇后，各项属性增加
 				if (g_Battle.g_ifUseMenshe[w])
 				{
 					iTotalCount /= 3;//3倍增加量
 					iTotalCount = std::max(iTotalCount, 1);
 				}
-			switch (ggConfig->m_Function_Set[13])//修改附加经验计算方式
+			switch (cfgExpFormula)//修改附加经验计算方式
 			{
 			case 1:
 			{
@@ -493,7 +494,7 @@ VOID CBattle::PAL_BattleWon(
 					dwExp = g_Battle.rgPlayer[i].dwExpGained;
 					dwExp *= rgTempExp.wCount * 2;
 					dwExp /= iTotalCount;
-					if (ggConfig->m_Function_Set[14])//额外附加经验
+					if (cfgBonusExp)//额外附加经验
 						dwExp *= 1.0 + std::min(1.0, iTotalCount / 50.0);
 					dwExp += rgTempExp.wExp;
 
@@ -529,7 +530,7 @@ VOID CBattle::PAL_BattleWon(
 							SDL_Rect bRect = rect;
 							setPictureRatio(&bRect);
 							VIDEO_UpdateScreen(gpTextureReal, &bRect, &bRect);
-						}					
+						}
 						PAL_WaitForKey(3000);
 					}
 				}
@@ -539,64 +540,89 @@ VOID CBattle::PAL_BattleWon(
 
 			case 0:
 			{
-#define CHECK_HIDDEN_EXP(expname, statname, label)          \
-				{\
-	dwExp = g_Battle.iExpGained;                             \
-	dwExp *= gpGlobals->Exp.expname[w].wCount;               \
-	dwExp /= iTotalCount;                                    \
-	dwExp *= 2;                                              \
-\
-	dwExp += gpGlobals->Exp.expname[w].wExp;                 \
-\
-\
-while (dwExp >= gpGlobals->g.rgLevelUpExp[std::min(MAX_LEVELS,(int) gpGlobals->Exp.expname[w].wLevel)]) \
-    {\
-		dwExp -= gpGlobals->g.rgLevelUpExp[gpGlobals->Exp.expname[w].wLevel]; \
-		gpGlobals->g.PlayerRoles.statname[w] += RandomLong(1, 2); \
-		if (gpGlobals->Exp.expname[w].wLevel < MAX_LEVELS)    \
-						{\
-			gpGlobals->Exp.expname[w].wLevel++;\
-						}\
-	}\
-\
-   gpGlobals->Exp.expname[w].wExp = (WORD)dwExp;\
-\
-   if (gpGlobals->g.PlayerRoles.statname[w] != \
-      OrigPlayerRoles.statname[w])\
-		{\
-      PAL_CreateSingleLineBox(PAL_XY(83, 60), 8, FALSE);\
-      PAL_DrawText(PAL_GetWord(gpGlobals->g.PlayerRoles.rgwName[w]), PAL_XY(95, 70), \
-         0, FALSE, FALSE); \
-      PAL_DrawText(PAL_GetWord(label), PAL_XY(143, 70),\
-         0, FALSE, FALSE);\
-      PAL_DrawText(PAL_GetWord(BATTLEWIN_LEVELUP_LABEL), PAL_XY(175, 70),  \
-         0, FALSE, FALSE);\
-      PAL_DrawNumber(gpGlobals->g.PlayerRoles.statname[w] - \
-         OrigPlayerRoles.statname[w],\
-         5, PAL_XY(188, 74), kNumColorYellow, kNumAlignRight); \
-      VIDEO_UpdateScreen(gpTextureReal);\
-      PAL_WaitForKey(3000);\
-		}\
-	}
-				CHECK_HIDDEN_EXP(rgHealthExp, rgwMaxHP, STATUS_LABEL_HP);
-				CHECK_HIDDEN_EXP(rgMagicExp, rgwMaxMP, STATUS_LABEL_MP);
-				CHECK_HIDDEN_EXP(rgAttackExp, rgwAttackStrength, STATUS_LABEL_ATTACKPOWER);
-				CHECK_HIDDEN_EXP(rgMagicPowerExp, rgwMagicStrength, STATUS_LABEL_MAGICPOWER);
-				CHECK_HIDDEN_EXP(rgDefenseExp, rgwDefense, STATUS_LABEL_RESISTANCE);
-				CHECK_HIDDEN_EXP(rgDexterityExp, rgwDexterity, STATUS_LABEL_DEXTERITY);
-				CHECK_HIDDEN_EXP(rgFleeExp, rgwFleeRate, STATUS_LABEL_FLEERATE);
+				//   extern PLAYERROLES OrigPlayerRoles;
+				for (int w = 0; w < MAX_PLAYER_ROLES; ++w) { 
+					// Lambda: 处理单个隐藏经验类型
+					auto CheckHidden = [&](EXPERIENCE& expData, WORD& currentStat, const WORD& origStat, int label) 
+						{
+						DWORD dwExp = g_Battle.iExpGained;
+						dwExp *= expData.wCount;
+						dwExp /= iTotalCount;
+						dwExp *= 2;
+						dwExp += expData.wExp;
+						if (cfgBonusExp)//额外附加经验
+							dwExp *= 1.0 + std::min(1.0, iTotalCount / 50.0);
+						while (dwExp >= gpGlobals->g.rgLevelUpExp[
+							std::min(MAX_LEVELS, static_cast<int>(expData.wLevel))]) {
+							dwExp -= gpGlobals->g.rgLevelUpExp[expData.wLevel];
+							currentStat += RandomLong(1, 2);
+							if (expData.wLevel < MAX_LEVELS) {
+								expData.wLevel++;
+							}
+						}
+						expData.wExp = static_cast<WORD>(dwExp);
 
-#undef CHECK_HIDDEN_EXP
+						if (currentStat != origStat) {
+							PAL_CreateSingleLineBox(PAL_XY(83, 60), 8, FALSE);
+							PAL_DrawText(PAL_GetWord(gpGlobals->g.PlayerRoles.rgwName[w]), PAL_XY(95, 70), 0, FALSE, FALSE);
+							PAL_DrawText(PAL_GetWord(label), PAL_XY(143, 70), 0, FALSE, FALSE);
+							PAL_DrawText(PAL_GetWord(BATTLEWIN_LEVELUP_LABEL), PAL_XY(175, 70), 0, FALSE, FALSE);
+							PAL_DrawNumber(currentStat - origStat, 5, PAL_XY(188, 74), kNumColorYellow, kNumAlignRight);
+							VIDEO_UpdateScreen(gpTextureReal);
+							PAL_WaitForKey(3000);
+						}
+						};
+
+					// 调用 7 次，每次传入对应字段
+					CheckHidden(
+						gpGlobals->Exp.rgHealthExp[w],
+						gpGlobals->g.PlayerRoles.rgwMaxHP[w],
+						OrigPlayerRoles.rgwMaxHP[w],
+						STATUS_LABEL_HP
+					);
+					CheckHidden(
+						gpGlobals->Exp.rgMagicExp[w],
+						gpGlobals->g.PlayerRoles.rgwMaxMP[w],
+						OrigPlayerRoles.rgwMaxMP[w],
+						STATUS_LABEL_MP
+					);
+					CheckHidden(
+						gpGlobals->Exp.rgAttackExp[w],
+						gpGlobals->g.PlayerRoles.rgwAttackStrength[w],
+						OrigPlayerRoles.rgwAttackStrength[w],
+						STATUS_LABEL_ATTACKPOWER
+					);
+					CheckHidden(
+						gpGlobals->Exp.rgMagicPowerExp[w],
+						gpGlobals->g.PlayerRoles.rgwMagicStrength[w],
+						OrigPlayerRoles.rgwMagicStrength[w],
+						STATUS_LABEL_MAGICPOWER
+					);
+					CheckHidden(
+						gpGlobals->Exp.rgDefenseExp[w],
+						gpGlobals->g.PlayerRoles.rgwDefense[w],
+						OrigPlayerRoles.rgwDefense[w],
+						STATUS_LABEL_RESISTANCE
+					);
+					CheckHidden(
+						gpGlobals->Exp.rgDexterityExp[w],
+						gpGlobals->g.PlayerRoles.rgwDexterity[w],
+						OrigPlayerRoles.rgwDexterity[w],
+						STATUS_LABEL_DEXTERITY
+					);
+					CheckHidden(
+						gpGlobals->Exp.rgFleeExp[w],
+						gpGlobals->g.PlayerRoles.rgwFleeRate[w],
+						OrigPlayerRoles.rgwFleeRate[w],
+						STATUS_LABEL_FLEERATE
+					);
+				}
 			}
 			break;
-			case 2:
+
 			default:
 				break;
 			}
-			//#else
-
-
-		//#endif
 		}
 
 		// 学习当前等级的所有法术
@@ -639,21 +665,18 @@ while (dwExp >= gpGlobals->g.rgLevelUpExp[std::min(MAX_LEVELS,(int) gpGlobals->E
 	}
 
 	// 运行战后脚本
-//#ifdef NEW_ScriptOnBattleEnd
-	if (ggConfig->m_Function_Set[12])
+	if (cfgPostBtlScript)
 		for (int i = 0; i < g_ScriptOnBattleEnd.size(); i++)
 		{
 			if (PalQuit)return;
 			PAL_RunTriggerScript(g_ScriptOnBattleEnd.at(i), i % 5);
 		}
-//#else
 	else
 		for (i = 0; i <= g_Battle.wMaxEnemyIndex; i++)
 		{
 			if (PalQuit)return;
 			PAL_RunTriggerScript(g_Battle.rgEnemy[i].wScriptOnBattleEnd, i);
 		}
-//#endif
 
 	// 每一场战斗后自动恢复
 	for (i = 0; i <= gpGlobals->wMaxPartyMemberIndex; i++)
@@ -717,102 +740,6 @@ VOID CBattle::PAL_BattleEnemyEscape(
 	g_Battle.BattleResult = kBattleResultTerminated;
 }
 
-VOID CBattle::PAL_BattlePlayerEscape(
-	VOID
-)
-/*++
-  目的：    Player flee the battle.
-  玩家在战斗中逃跑。
-  参数：    无。
-  返回值：    无。
-  --*/
-{
-	int         i, j;
-	WORD        wPlayerRole;
-
-	SOUND_Play(45);
-
-	PAL_BattleUpdateFighters();
-
-	for (i = 0; i <= gpGlobals->wMaxPartyMemberIndex; i++)
-	{
-		wPlayerRole = gpGlobals->rgParty[i].wPlayerRole;
-
-		if (gpGlobals->g.PlayerRoles.rgwHP[wPlayerRole] > 0)
-		{
-			g_Battle.rgPlayer[i].wCurrentFrame = 0;
-		}
-	}
-
-	for (i = 0; i < 16; i++)
-	{
-		for (j = 0; j <= gpGlobals->wMaxPartyMemberIndex; j++)
-		{
-			wPlayerRole = gpGlobals->rgParty[j].wPlayerRole;
-
-			if (gpGlobals->g.PlayerRoles.rgwHP[wPlayerRole] > 0)
-			{
-				//
-				// TODO: This is still not the same as the original game
-				//
-				switch (j)
-				{
-				case 0:
-					if (gpGlobals->wMaxPartyMemberIndex > 0)
-					{
-						g_Battle.rgPlayer[j].pos =
-							PAL_XY(PAL_X(g_Battle.rgPlayer[j].pos) + 4,
-								PAL_Y(g_Battle.rgPlayer[j].pos) + 6);
-						break;
-					}
-
-				case 1:
-					g_Battle.rgPlayer[j].pos =
-						PAL_XY(PAL_X(g_Battle.rgPlayer[j].pos) + 4,
-							PAL_Y(g_Battle.rgPlayer[j].pos) + 4);
-					break;
-
-				case 2:
-					g_Battle.rgPlayer[j].pos =
-						PAL_XY(PAL_X(g_Battle.rgPlayer[j].pos) + 6,
-							PAL_Y(g_Battle.rgPlayer[j].pos) + 3);
-					break;
-
-				case 3:
-					g_Battle.rgPlayer[j].pos =
-						PAL_XY(PAL_X(g_Battle.rgPlayer[j].pos) + 7,
-							PAL_Y(g_Battle.rgPlayer[j].pos) + 2);
-					break;
-
-				case 4:
-					g_Battle.rgPlayer[j].pos =
-						PAL_XY(PAL_X(g_Battle.rgPlayer[j].pos) + 8,
-							PAL_Y(g_Battle.rgPlayer[j].pos) + 1);
-					break;
-
-				default:
-					assert(FALSE); // Not possible
-					break;
-				}
-			}
-		}
-
-		PAL_BattleDelay(1, 0, FALSE);
-	}
-
-	//
-	// Remove all players from the screen
-	// 从屏幕中移走所有角色
-	for (i = 0; i <= gpGlobals->wMaxPartyMemberIndex; i++)
-	{
-		g_Battle.rgPlayer[i].pos = PAL_XY(9999, 9999);
-	}
-
-	PAL_BattleDelay(1, 0, FALSE);
-
-	g_Battle.BattleResult = kBattleResultFleed;
-}
-
 BATTLERESULT CBattle::PAL_StartBattle(
 	WORD			wEnemyTeam,
 	BOOL			fIsBoss
@@ -860,6 +787,7 @@ BATTLERESULT CBattle::PAL_StartBattle(
 		gpGlobals->g.PlayerRoles.rgwHP[w] = std::max((int)gpGlobals->g.PlayerRoles.rgwHP[w], 1);
 
 		gpGlobals->rgPlayerStatus[w][kStatusPuppet] = 0;
+
 		gpGlobals->Exp.rgHealthExp[w].wCount = 0;
 		gpGlobals->Exp.rgMagicExp[w].wCount = 0;
 		gpGlobals->Exp.rgAttackExp[w].wCount = 0;
@@ -879,9 +807,11 @@ BATTLERESULT CBattle::PAL_StartBattle(
 	// Store all enemies
 	{
 		int i;
+		g_Battle.clearrBATTLEENEMY();
 		for (i = 0; i < MAX_ENEMIES_IN_TEAM; i++)
 		{
-			memset(&(g_Battle.rgEnemy[i]), 0, sizeof(BATTLEENEMY));
+			//memset(&(g_Battle.rgEnemy[i]), 0, sizeof(BATTLEENEMY) - sizeof(ByteArray));
+			
 			w = gpGlobals->g.lprgEnemyTeam[wEnemyTeam].rgwEnemy[i];
 
 			if (w == 0xFFFF)
@@ -897,112 +827,15 @@ BATTLERESULT CBattle::PAL_StartBattle(
 				g_Battle.rgEnemy[i].dwMaxHealth = g_Battle.rgEnemy[i].dwActualHealth;
 				g_Battle.rgEnemy[i].dwExp = g_Battle.rgEnemy[i].e.wExps;
 
-//#ifdef STRENGTHEN_ENEMY
-				if (ggConfig->m_Function_Set[3])
+				if (cfgBuffEarlyFoe)
 					g_Battle.rgEnemy[i] = PAL_New_StrengthenEnemy(g_Battle.rgEnemy[i]);
-//#endif
+
 				g_Battle.rgEnemy[i].wObjectID = w;
-				g_Battle.rgEnemy[i].state = kFighterWait;
+				g_Battle.rgEnemy[i].state = FIGHTERSTATE::kFighterWait;
 				g_Battle.rgEnemy[i].wScriptOnTurnStart = gpGlobals->g.rgObject[w].enemy.wScriptOnTurnStart;
 				g_Battle.rgEnemy[i].wScriptOnBattleEnd = gpGlobals->g.rgObject[w].enemy.wScriptOnBattleEnd;
 				g_Battle.rgEnemy[i].wScriptOnReady = gpGlobals->g.rgObject[w].enemy.wScriptOnReady;
 				g_Battle.rgEnemy[i].iColorShift = 0;
-#ifndef PAL_CLASSIC
-				g_Battle.rgEnemy[i].flTimeMeter = 50;
-				//flTimeMeter：时间条（满条即可行动）
-				//
-				// HACK: Otherwise the black thief lady will be too hard to beat
-				//削减女飞贼的身法值
-				if (g_Battle.rgEnemy[i].e.wDexterity == 164)
-				{
-					g_Battle.rgEnemy[i].e.wDexterity /= ((gpGlobals->wMaxPartyMemberIndex == 0) ? 6 : 3);
-				}
-
-				//
-				// HACK: Heal up automatically for final boss
-				//最终boss战前自动回复体力和真气
-				if (g_Battle.rgEnemy[i].dwActualHealth > 30000)
-				{
-					for (w = 0; w < MAX_PLAYER_ROLES; w++)
-					{
-						gpGlobals->g.PlayerRoles.rgwHP[w] = gpGlobals->g.PlayerRoles.rgwMaxHP[w];
-						gpGlobals->g.PlayerRoles.rgwMP[w] = gpGlobals->g.PlayerRoles.rgwMaxMP[w];
-					}
-				}
-
-				//
-				// Yet another HACKs
-				//
-				if ((SHORT)g_Battle.rgEnemy[i].e.wDexterity == -32)
-				{
-					g_Battle.rgEnemy[i].e.wDexterity = 0; // for Grandma Knife //菜刀婆婆
-				}
-				else if (g_Battle.rgEnemy[i].e.wDexterity == 20)
-				{
-					//
-					// for Fox Demon
-					//
-					if (gpGlobals->g.PlayerRoles.rgwLevel[0] < 15)
-					{
-						g_Battle.rgEnemy[i].e.wDexterity = 8;
-					}
-					else if (gpGlobals->g.PlayerRoles.rgwLevel[4] > 28 ||
-						gpGlobals->Exp.rgPrimaryExp[4].wExp > 0)
-					{
-						g_Battle.rgEnemy[i].e.wDexterity = 60;
-					}
-				}
-				else if (g_Battle.rgEnemy[i].e.wExp == 250 &&
-					g_Battle.rgEnemy[i].e.wCash == 1100)
-				{
-					g_Battle.rgEnemy[i].e.wDexterity += 12; // for Snake Demon
-				}
-				else if ((SHORT)g_Battle.rgEnemy[i].e.wDexterity == -60)
-				{
-					g_Battle.rgEnemy[i].e.wDexterity = 15; // for Spider
-				}
-				else if ((SHORT)g_Battle.rgEnemy[i].e.wDexterity == -30)
-				{
-					g_Battle.rgEnemy[i].e.wDexterity = (WORD)-10; // for Stone Head
-				}
-				else if ((SHORT)g_Battle.rgEnemy[i].e.wDexterity == -16)
-				{
-					g_Battle.rgEnemy[i].e.wDexterity = 0; // for Zombie
-				}
-				else if ((SHORT)g_Battle.rgEnemy[i].e.wDexterity == -20)
-				{
-					g_Battle.rgEnemy[i].e.wDexterity = -8; // for Flower Demon
-				}
-				else if (g_Battle.rgEnemy[i].e.wLevel < 20 &&
-					gpGlobals->wNumScene >= 0xD8 && gpGlobals->wNumScene <= 0xE2)
-				{
-					//
-					// for low-level monsters in the Cave of Trial
-					//
-					g_Battle.rgEnemy[i].e.wLevel += 15;
-					g_Battle.rgEnemy[i].e.wDexterity += 25;
-				}
-				else if (gpGlobals->wNumScene == 0x90)
-				{
-					g_Battle.rgEnemy[i].e.wDexterity += 25; // for Tower Dragons
-				}
-				else if (g_Battle.rgEnemy[i].e.wLevel == 2 &&
-					g_Battle.rgEnemy[i].e.wCash == 48)
-				{
-					g_Battle.rgEnemy[i].e.wDexterity += 8; // for Miao Fists
-				}
-				else if (g_Battle.rgEnemy[i].e.wLevel == 4 &&
-					g_Battle.rgEnemy[i].e.wCash == 240)
-				{
-					g_Battle.rgEnemy[i].e.wDexterity += 18; // for Fat Miao
-				}
-				else if (g_Battle.rgEnemy[i].e.wLevel == 16 &&
-					g_Battle.rgEnemy[i].e.wMagicRate == 4 &&
-					g_Battle.rgEnemy[i].e.wAttackEquivItemRate == 4)
-				{
-					g_Battle.rgEnemy[i].e.wDexterity += 50; // for Black Spider
-				}
-#endif
 			}
 		}
 
@@ -1011,21 +844,15 @@ BATTLERESULT CBattle::PAL_StartBattle(
 	// Store all players
 	for (int i = 0; i <= gpGlobals->wMaxPartyMemberIndex; i++)
 	{
-		g_Battle.rgPlayer[i].flTimeMeter = 15.0f;
-#ifndef PAL_CLASSIC
-		g_Battle.rgPlayer[i].flTimeSpeedModifier = 2.0f;
-		g_Battle.rgPlayer[i].sTurnOrder = -1;
-#endif
 		g_Battle.rgPlayer[i].wHidingTime = 0;
-		g_Battle.rgPlayer[i].state = kFighterWait;
+		g_Battle.rgPlayer[i].state = FIGHTERSTATE::kFighterWait;
 		g_Battle.rgPlayer[i].action.sTarget = -1;
 		g_Battle.rgPlayer[i].fDefending = FALSE;
 		g_Battle.rgPlayer[i].wCurrentFrame = 0;
 		g_Battle.rgPlayer[i].iColorShift = FALSE;
 
-#ifdef EDIT_EXP_CALCULATION
-		g_Battle.rgPlayer[i].dwExpGained = 0;
-#endif
+		if (cfgExpFormula)
+			g_Battle.rgPlayer[i].dwExpGained = 0;
 	}
 
 	//
@@ -1047,21 +874,20 @@ BATTLERESULT CBattle::PAL_StartBattle(
 	g_Battle.fIsBoss = fIsBoss;
 	g_Battle.fEnemyCleared = FALSE;
 	g_Battle.fEnemyMoving = FALSE;
-	g_Battle.iHidingTime = 0;
+	PAL_SetHidingTime(0);
 	g_Battle.wMovingPlayerIndex = 0;
 
 	g_Battle.UI.szMsg[0] = '\0';
 	g_Battle.UI.szNextMsg[0] = '\0';
 	g_Battle.UI.dwMsgShowTime = 0;
-	g_Battle.UI.state = kBattleUIWait;
 	g_Battle.UI.fAutoAttack = FALSE;
 	g_Battle.UI.wSelectedIndex = 0;
 	g_Battle.UI.wPrevEnemyTarget = 0;
 	g_Battle.UI.wSelectedAction = 0;
 
-	memset(g_Battle.UI.rgShowNum, 0, sizeof(g_Battle.UI.rgShowNum));
+	//memset(g_Battle.UI.rgShowNum, 0, sizeof(g_Battle.UI.rgShowNum));
 
-	g_Battle.lpSummonSprite = NULL;
+	g_Battle.lpSummonSprite.clear();
 	g_Battle.sBackgroundColorShift = 0;
 
 	fInBattle = TRUE;
@@ -1073,20 +899,12 @@ BATTLERESULT CBattle::PAL_StartBattle(
 	// Load the battle effect sprite.
 	
 	{
-		int i = PAL_MKFGetChunkSize(10, gpGlobals->f.fpDATA);
-		g_Battle.lpEffectSprite = (LPBYTE)malloc(i);
-
-		PAL_MKFReadChunk(g_Battle.lpEffectSprite, i, 10, gpGlobals->f.fpDATA);
+		g_Battle.lpEffectSprite = PAL_MKFReadChunk(10, gpGlobals->f.fpDATA);
 	}
-#ifdef PAL_CLASSIC
-	g_Battle.Phase = kBattlePhaseSelectAction;
+	g_Battle.Phase = BATTLEPHASE::kBattlePhaseSelectAction;
 	g_Battle.fRepeat = FALSE;
 	g_Battle.fForce = FALSE;
 	g_Battle.fFlee = FALSE;
-#endif
-#ifdef PAL_ALLOW_KEYREPEAT
-	SDL_EnableKeyRepeat(120, 75);
-#endif
 
 	//
 	// Run the main battle routine.
@@ -1128,7 +946,7 @@ BATTLERESULT CBattle::PAL_StartBattle(
 	// Free all the battle sprites
 	//
 	PAL_FreeBattleSprites();
- 	free(g_Battle.lpEffectSprite);
+ 	//free(g_Battle.lpEffectSprite);
 
 	//
 	// Free the surfaces for the background picture and scene buffer
@@ -1170,7 +988,7 @@ VOID CBattle::Pal_New_RecoverAfterBattle(
 		wRecoverValue = std::min(wDiff * wPercent / 100, std::max(MAX_PARAMETER,(int)gpGlobals->g.PlayerRoles.rgwMaxHP[wPlayerRole]) / 2);
 		gpGlobals->g.PlayerRoles.rgwHP[wPlayerRole] += wRecoverValue;
 	}
-	if (ggConfig->m_Function_Set[15])//额外恢复
+	if (cfgBonusRecover)//额外恢复
 	{
 		wDiff = std::max(0, gpGlobals->g.PlayerRoles.rgwMaxMP[wPlayerRole] - gpGlobals->g.PlayerRoles.rgwMP[wPlayerRole]);
 		if (wDiff < 20.0 * pow(1.0 * gpGlobals->g.PlayerRoles.rgwLevel[wPlayerRole] + 5, 0.66))
@@ -1185,7 +1003,7 @@ VOID CBattle::Pal_New_RecoverAfterBattle(
 }
 
 
-//#ifdef STRENGTHEN_ENEMY
+//#ifdef cfgBuffEarlyFoe
 BATTLEENEMY CBattle::PAL_New_StrengthenEnemy(
 	BATTLEENEMY			be
 )

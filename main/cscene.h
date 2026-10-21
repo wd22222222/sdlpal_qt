@@ -17,8 +17,7 @@ class CScene: public CPalBaseIO
         int              iLayer;        // logical layer
     } SPRITE_TO_DRAW;
 
-    typedef std::vector<SPRITE_TO_DRAW> SPRITE_TO_DRAW_ARRAY;
-    SPRITE_TO_DRAW_ARRAY    g_rgSpriteToDraw;
+    std::vector<SPRITE_TO_DRAW>   g_rgSpriteToDraw;
 
 public:
     CScene();

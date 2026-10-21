@@ -353,8 +353,6 @@ VOID CScreen::VIDEO_UpdateSurfacePalette(SDL_Surface* pSurface)
 
 VOID CScreen::VIDEO_UpdateScreen(PalTexture& lpDstText, const SDL_Rect* lpSrcRect,const SDL_Rect* lpDstRect)
 {
-    //if (lpDstText.isVilid() && lpDstText.getID() != gpRenderTexture.getID())
-        //RenderBlendCopy(gpRenderTexture,lpDstText,getAlpha(), RenderMode::rmMode1, getpColor(),lpSrcRect,lpDstRect);
     if (g_wShakeTime)
     {
         if (g_wShakeTime & 1)
@@ -612,31 +610,13 @@ SDL_Color* CScreen::PAL_GetPalette(
     static SDL_Color      palette[256]{0};
     PAL_LARGE BYTE        buf[1536]{0};
     INT                   i;
-    FILE* fp;
-
-    std::string path = PalDir + "pat.mkf";
-    fp = fopen(path.c_str(),"rb");
-    SDL_zero(buf);
+ 
+    memset(palette, 0xff, sizeof(SDL_Color) * 256);
+        
     //
     // Read the palette data from the pat.mkf file
     //
-    UINT     uiOffset = 0;
-    UINT     uiNextOffset = 0;
-
-    //i = PAL_MKFReadChunk(buf, 1536, iPaletteNum, fp);
-    fseek(fp, 4 * iPaletteNum, SEEK_SET);
-    fread(&uiOffset, 4, 1, fp);
-    fread(&uiNextOffset, 4, 1, fp);
-    uiOffset = SWAP32(uiOffset);
-    uiNextOffset = SWAP32(uiNextOffset);
-    i = uiNextOffset - uiOffset;
-    
-    if (i > 0)
-    {
-        fseek(fp, uiOffset, SEEK_SET);
-        fread(buf, i, 1, fp);
-    }
-    fclose(fp);
+    i = PAL_MKFReadChunk(buf, 1536, iPaletteNum, gpGlobals->f.fpPAT);
 
     if (i < 0)
     {
@@ -653,13 +633,14 @@ SDL_Color* CScreen::PAL_GetPalette(
         fNight = FALSE;
     }
 
+
     for (i = 0; i < 256; i++)
     {
         palette[i].r = buf[(fNight ? 256 * 3 : 0) + i * 3] << 2;
         palette[i].g = buf[(fNight ? 256 * 3 : 0) + i * 3 + 1] << 2;
         palette[i].b = buf[(fNight ? 256 * 3 : 0) + i * 3 + 2] << 2;
         palette[i].a = 255;
-        if ( i && ggConfig->m_Function_Set[51] == 1)
+        if ( i && cfgBrightBoost == 1)
         {
             palette[i].r += (255 - palette[i].r) / 16;
             palette[i].g += (255 - palette[i].g) / 16;
@@ -767,6 +748,7 @@ VOID CScreen::PAL_DrawNumber(
     }
 
 }
+
 //在纹理上显示汉字
 PalErr CScreen::CopyFontToTexture(PalTexture& rpRender, std::wstring text,
     const SDL_Color* rColor, const PAL_POS pos, const float scale)
@@ -786,6 +768,7 @@ PalErr CScreen::CopyFontToTexture(PalTexture& rpRender, std::wstring text,
         if (it == characters.end()) {
             // 尝试动态加载字符
             if (loadCharacter(c)) {
+                std::wcout << L"加载字符失败"  << c ;
                 continue;
             }
             it = characters.find(c);
@@ -803,7 +786,8 @@ PalErr CScreen::CopyFontToTexture(PalTexture& rpRender, std::wstring text,
         PalSize msSize{ch.size};
         PalSize mdSize = rpRender.size();
 
-        setRectToArr(nullptr, &dstRect, ch.size, mdSize);
+        //g_vertices = setRectToArr(nullptr, &dstRect, ch.size, mdSize);
+        memcpy((void*)g_vertices, setRectToArr(nullptr, &dstRect, ch.size, mdSize).data(), sizeof(g_vertices));
 
         glEnable(GL_TEXTURE_2D);
         glActiveTexture(GL_TEXTURE0);
@@ -813,7 +797,7 @@ PalErr CScreen::CopyFontToTexture(PalTexture& rpRender, std::wstring text,
 
         err = glGetError() + err;
 
-        glVertexAttribPointer(v_vertexID, 4, GL_FLOAT, GL_FALSE, 0, g_vertices.data());
+        glVertexAttribPointer(v_vertexID, 4, GL_FLOAT, GL_FALSE, 0, g_vertices);
         err = glGetError() + err;
         SDL_fColor dataBuf[20]{};
         err = glGetError() + err;
@@ -854,7 +838,7 @@ PalErr CScreen::CopyFontToTexture(PalTexture& rpRender, LPCWSTR text, const SDL_
 
 PalErr CScreen::RenderBlendCopy(PalTexture& rpRender,
     PalTexture& rpText1, const WORD rAlpha, const RenderMode mode,
-    const SDL_Color* rColor, const SDL_Rect* dstRect, const SDL_Rect* srcRect)
+    const SDL_Color* rColor, const SDL_Rect* dstRect, const SDL_Rect* srcRect)const
 
     /*
     模式功能
@@ -894,7 +878,7 @@ PalErr CScreen::RenderBlendCopy(PalTexture& rpRender,
     }
     
 	// 计算顶点坐标
-    setRectToArr(srcRect, dstRect, msSize, mdSize);
+    memcpy((void*)g_vertices,setRectToArr(srcRect, dstRect, msSize, mdSize).data(), sizeof(g_vertices));
     
     SDL_Color vColor = { 255,255,255,255 };
     if (rColor == NULL)
@@ -925,7 +909,7 @@ PalErr CScreen::RenderBlendCopy(PalTexture& rpRender,
 
     err = glGetError() + err;
 
-    glVertexAttribPointer(v_vertexID, 4, GL_FLOAT, GL_FALSE, 0, g_vertices.data());
+    glVertexAttribPointer(v_vertexID, 4, GL_FLOAT, GL_FALSE, 0, g_vertices);
     err = glGetError() + err;
     SDL_fColor dataBuf[20]{};
     err = glGetError() + err;
@@ -1018,12 +1002,10 @@ PalErr CScreen::RenderBlendCopy(PalTexture& rpRender,
 
 PalErr CScreen::RenderPresent(PalTexture& glRender, INT dAlpha)
 {
-    if (ggConfig == nullptr)
-        return PalErr(0);//还没有初始化
     if (glRender.getID() != gpRenderTexture.getID())
         RenderBlendCopy(gpRenderTexture, glRender, 255);
     PalTexture s;//空纹理
-    if (mouseInputStart)
+    if (mouseInputStart && cfgShowCursor)
         PAL_DrawMouseInputBox();
     RenderBlendCopy(s, gpRenderTexture, dAlpha, RenderMode::rmMode10);
     SDL_GL_SwapWindow(gpWindow);
@@ -1168,7 +1150,7 @@ void CScreen::PAL_CreateMouseInputBoxText()
 }
 
 
-void CScreen::setRectToArr(const SDL_Rect* src, const SDL_Rect* dst, const Pal_Size srcSize, const Pal_Size dstSize)
+std::vector<GLfloat> CScreen::setRectToArr(const SDL_Rect* src, const SDL_Rect* dst, const Pal_Size srcSize, const Pal_Size dstSize)const
 {
 	// src 目标区域,空则全图
 	// dst 显示区域，空则全屏
@@ -1207,12 +1189,13 @@ void CScreen::setRectToArr(const SDL_Rect* src, const SDL_Rect* dst, const Pal_S
         maxv = 1.0f;
     }
 
-    g_vertices = {
+    std::vector<GLfloat> g_vertices = {
         minx, miny, minu, minv,//左上
-		maxx, miny, maxu, minv,//右上
-		maxx, maxy, maxu, maxv,//右下
-		minx, maxy, minu, maxv, //左下
+        maxx, miny, maxu, minv,//右上
+        maxx, maxy, maxu, maxv,//右下
+        minx, maxy, minu, maxv, //左下
     };
+    return g_vertices;
 }
 
 
@@ -1644,26 +1627,26 @@ PalErr CScreen::FontInit()
     }
     int Success{};
     // 加载字体
-    if (ggConfig->m_Function_Set[46])//使用粗体字
+    if (cfgBoldFont)//使用粗体字
     {
-        if (!FT_New_Face(ft, ggConfig->m_FontName.c_str(), 1, &face))
+        if (!FT_New_Face(ft, CConfig::m_FontName.c_str(), 1, &face))
         {
-            std::cout << ggConfig->m_FontName.c_str() << "使用粗体字成功" << std::endl;
+            std::cout << CConfig::m_FontName.c_str() << "使用粗体字成功" << std::endl;
             Success = 1;
         }
         else {
-            std::cout << ggConfig->m_FontName.c_str() << "使用粗体字失败" << std::endl;
+            std::cout << CConfig::m_FontName.c_str() << "使用粗体字失败" << std::endl;
         }
     }
-    if (!Success && FT_New_Face(ft, ggConfig->m_FontName.c_str(), 0, &face))
+    if (!Success && FT_New_Face(ft, CConfig::m_FontName.c_str(), 0, &face))
     {
         std::cout << "ERROR::FREETYPE: Failed to load font: "
-            << ggConfig->m_FontName.c_str() << std::endl;
+            << CConfig::m_FontName.c_str() << std::endl;
         FT_Done_FreeType(ft);
         return PalErr(1);
     }
 
-    std::cout << "字体文件加载成功: " << ggConfig->m_FontName.c_str() << std::endl;
+    std::cout << "字体文件加载成功: " << CConfig::m_FontName.c_str() << std::endl;
 
     // 设置字体大小
     FT_Set_Pixel_Sizes(face, 0, HZSIZE);
@@ -1837,9 +1820,9 @@ INT CScreen::VideoInit() {
         SDL_SetWindowPosition(gpWindow, dRect.w * 0.10, dRect.h * 0.10);
     }
 
-    KeepAspectRatio = ggConfig->fKeepAspectRatio;//保持窗口比率
+    KeepAspectRatio = cfgKeepAspect;//保持窗口比率
     //初始化文字
-    int bIsBig5 = (gpGlobals->bIsBig5 ? 1 : 0) + (ggConfig->fIsUseBig5 ? 2 : 0);
+    int bIsBig5 = (gpGlobals->bIsBig5 ? 1 : 0) + (cfgUseBig5 ? 2 : 0);
 
     if (FontInit())
     {

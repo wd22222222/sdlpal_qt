@@ -16,6 +16,7 @@ typedef enum  class textType
 {
     noType,
     red8,
+    rgb15,
     rgb16,
     rgb24,
     rgba32
@@ -25,7 +26,7 @@ typedef enum  class textType
 // opengl二维纹理封装类
 class PalTexture {
 private:
-    GLuint textureID{0};
+    GLuint textureID{};
     int w{};
     int h{};
     textType t{};
@@ -41,14 +42,13 @@ public:
     PalTexture();
     PalTexture(int aw, int ah, textType at = textType::rgba32,
         const SDL_Color * colors = nullptr);
-    PalTexture(SDL_Surface* surface);
+    PalTexture(const SDL_Surface* surface);
     PalTexture(PalSurface& surface);
     PalTexture(const PalTexture&) = delete;
     //移动构造函数
-    PalTexture(PalTexture&& other) noexcept;;
+    PalTexture(PalTexture&& other) noexcept;
+	//删除拷贝赋值运算符
     PalTexture& operator=(const PalTexture&) = delete;
-
-
     //移动构造函数
     PalTexture& operator=(PalTexture&& other)noexcept;
     
@@ -57,8 +57,8 @@ public:
     //构建函数
  	PalErr creat(int aw, int ah, textType at, 
         const SDL_Color* colors = nullptr);
-	PalErr creat(SDL_Surface* surface);
-    PalErr creat(PalSurface& surface);
+	PalErr creat(const SDL_Surface* surface);
+    PalErr creat(const PalSurface& surface);
 
     PalErr UpdateTexture(const SDL_Rect* rRect, const void* pixels, INT pitch);
 
@@ -88,15 +88,15 @@ public:
         return h;
 	};  
 
-    enum textType getType() { 
+    enum textType getType()const { 
         return t;
     };
     //取调色版ID
     const GLint getPaletteID() const { return paletteID; };
     //设置透明色
     PalErr setTransparent_Color(const PAL_Color& color);
-	//取得透明色
-    PAL_Color getTransparent_Color();
+	//取得透明色(未使用)
+    PAL_Color& getTransparent_Color();
 	//取纹理像素数据
 	ByteArray getData();
 	//用数据更新纹理内容
@@ -107,7 +107,7 @@ public:
         w = aw;
         h = ah;
 	};
-    Pal_Size getSize()
+    Pal_Size getSize()const
     {
         return Pal_Size(w, h);
     }
@@ -123,15 +123,15 @@ public:
         return isEmpty();
     }
     //取每像素位数
-    int getBitsPerPixel();
+    const int getBitsPerPixel()const;
     //返回每像素占用字节数
-    int getBytesPerPixel()
+    const int getBytesPerPixel()const
     {
-        return getBitsPerPixel() << 3;
+        return (getBitsPerPixel() + 1) << 3;
     }
 
     //输入bytesPerPixel 转换为 纹理类型
-    const textType getTextType(UINT s) {
+    const textType getTextType(UINT s)const {
         switch (s)
         {
         case 1:

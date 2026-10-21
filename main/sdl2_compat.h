@@ -389,17 +389,17 @@ inline int get_Surface_bitsPerPixel(SDL_Surface* s)
 
 #else
 
-inline SDL_Color* get_Surface_Palette(SDL_Surface* sur)
+inline SDL_Color* get_Surface_Palette(const SDL_Surface* sur)
 {
     return sur->format->palette->colors;
 }
 
-inline int get_Surface_bitsPerPixel(SDL_Surface* surface)
+inline int get_Surface_bitsPerPixel(const SDL_Surface* surface)
 {
     return surface->format->BitsPerPixel;
 }
 
-inline  SDL_Palette* SDLCALL SDL_GetSurfacePalette(SDL_Surface* surface)
+inline  SDL_Palette* SDLCALL SDL_GetSurfacePalette(const SDL_Surface* surface)
 {
     return surface->format->palette;
 };

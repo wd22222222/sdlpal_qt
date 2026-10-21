@@ -131,7 +131,7 @@ void CMapEdit::doUndo()
     MAPUNDO& u = m_undoArray.at(--m_UndoCount);
     auto p = u.tPos;
     int x = (p >> 1) & 0x7f; int  y = (p >> 16) & 0xff; int h = p & 1;
-    m_Pal->m_pPalMap->MapTiles[y][x][h] = u.tOld;
+    m_Pal->pal->gpResources->lpMap->MapTiles[y][x][h] = u.tOld;
     m_MapPixSelectRect = ImagePointToDraw(u.tPos);
     MakeMapImage(m_Map, m_Flags);
 }
@@ -143,7 +143,7 @@ void CMapEdit::doRedo()
     MAPUNDO& u = m_undoArray.at(m_UndoCount++);
     auto i = u.tPos;
     int x = (i >> 1) & 0x7f, y = (i >> 16) & 0xff, h = i & 1;
-    m_Pal->m_pPalMap->MapTiles[y][x][h] = u.tNew;
+    m_Pal->pal->gpResources->lpMap->MapTiles[y][x][h] = u.tNew;
     m_MapPixSelectRect = ImagePointToDraw(u.tPos);
     MakeMapImage(m_Map, m_Flags);
 }
@@ -203,11 +203,9 @@ void CMapEdit::init(int sMap)
     m_Pal->pal->PAL_SetPalette(0, 0);
     auto& fpMAP = m_Pal->pal->gpGlobals->f.fpMAP;
     auto& fpGOP = m_Pal->pal->gpGlobals->f.fpGOP;
-    if (m_Pal->m_pPalMap)
-    {
-        m_Pal->pal->PAL_FreeMap(m_Pal->m_pPalMap);
-    }
-    m_Pal->m_pPalMap = m_Pal->pal->gpResources->lpMap = nullptr;
+    auto& m_pPalMap = m_Pal->pal->gpResources->lpMap;
+    m_pPalMap.release();
+
     if (sMap == -1)//初始阶段
     {
         int s_nMap{};
@@ -253,9 +251,9 @@ void CMapEdit::init(int sMap)
         init(0);
         return;
     }
-    auto& palMap = m_Pal->m_pPalMap;
-    palMap = m_Pal->pal->PAL_LoadMap(sMap,m_Pal->pal->gpGlobals->f.fpMAP,m_Pal->pal->gpGlobals->f.fpGOP);
-    if (!palMap)
+    
+    m_Pal->pal->gpResources->lpMap = m_Pal->pal->PAL_LoadMap(sMap,m_Pal->pal->gpGlobals->f.fpMAP,m_Pal->pal->gpGlobals->f.fpGOP);
+    if (m_Pal->pal->gpResources->lpMap->pTileSprite.empty())
     {
         m_ImageList->hide();
         m_Map.fill(Qt::black);
@@ -263,7 +261,7 @@ void CMapEdit::init(int sMap)
         m_MiniMapLable.setPixmap(QPixmap::fromImage(m_Map));
         return;
     }
-    WORD ntitle = *(WORD*)palMap->pTileSprite - 1;
+    WORD ntitle = *(WORD*)m_Pal->pal->gpResources->lpMap->pTileSprite.data() - 1;
     QString title = QString::asprintf("地图编辑 %3.3d 图片数 %d", sMap,ntitle);
     setWindowTitle(title);
     ColArray& w_ColData = s_ImageData.c_Array;
@@ -278,12 +276,12 @@ void CMapEdit::init(int sMap)
     }
     //设置取图片函数
     w_ColData[0].f_Pixmap = [&](int row)->QPixmap{
-            if (!palMap)
+            if (!m_Pal->pal->gpResources->lpMap->pTileSprite.size())
                 return QPixmap();
             QImage m(32, 15, QImage::Format_Indexed8);
             m.setColorTable(m_Pal->sdl_PaltteToQColorList( m_Pal->pal->gpPalette->colors));
             m.fill(0);
-            auto lpSprite = m_Pal->pal->PAL_SpriteGetFrame((LPBYTE)palMap->pTileSprite, row);
+            auto lpSprite = m_Pal->pal->PAL_SpriteGetFrame(m_Pal->pal->gpResources->lpMap->pTileSprite, row);
             if (!lpSprite)
                 return QPixmap();
             m_Pal->PAL_RLEBlitToSurface(lpSprite, m, 0);
@@ -319,10 +317,10 @@ INT CMapEdit::MakeMapImage(QImage& mm, const DWORD flag)
     PAL_Rect rect = { 0,0,MapPixWidth,MapPixHight };
     //画底层
     if (flag & map_Bottom)
-        m_Pal->PAL_MapBlitToSurface(m_Pal->m_pPalMap, m, &rect, 0);
+        m_Pal->PAL_MapBlitToSurface(m_Pal->pal->gpResources->lpMap.get(), m, &rect, 0);
     //画顶层
     if (flag & map_Top)
-        m_Pal->PAL_MapBlitToSurface(m_Pal->m_pPalMap, m, &rect, 1);
+        m_Pal->PAL_MapBlitToSurface(m_Pal->pal->gpResources->lpMap.get(), m, &rect, 1);
     mm = m.convertToFormat(QImage::Format_ARGB32);
     //画障碍
     if (flag & map_Barrier)
@@ -448,7 +446,7 @@ void CMapEdit::mouseDoubleClickEvent(QMouseEvent* event)
     //检查修改
     if (sUndo.tOld == sUndo.tNew)
         return;
-    m_Pal->m_pPalMap->MapTiles[sy][sx][sh] = sUndo.tNew;
+    m_Pal->pal->gpResources->lpMap->MapTiles[sy][sx][sh] = sUndo.tNew;
     doAddUndo(sUndo);
     //更新屏幕底图
     MakeMapImage(m_Map,m_Flags);

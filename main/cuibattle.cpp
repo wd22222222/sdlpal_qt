@@ -50,18 +50,18 @@ BOOL CUIBattle::PAL_BattleUIIsActionValid(
 
 	switch (ActionType)
 	{
-	case kBattleUIActionAttack:		// 直接攻击
-	case kBattleUIActionMisc:		// 杂项
+	case BATTLEUIACTION::kBattleUIActionAttack:		// 直接攻击
+	case BATTLEUIACTION::kBattleUIActionMisc:		// 杂项
 		break;
 
-	case kBattleUIActionMagic:		// 仙术
+	case BATTLEUIACTION::kBattleUIActionMagic:		// 仙术
 		if (gpGlobals->rgPlayerStatus[wPlayerRole][kStatusSilence] != 0)
 		{ // 如果角色状态为咒封，则不能使用仙术
 			return FALSE;
 		}
 		break;
 
-	case kBattleUIActionCoopMagic:// 合体魔法
+	case BATTLEUIACTION::kBattleUIActionCoopMagic:// 合体魔法
 	{
 		if (gpGlobals->wMaxPartyMemberIndex == 0)
 		{		// 只有一个角色时，不能使用合体魔法
@@ -71,16 +71,7 @@ BOOL CUIBattle::PAL_BattleUIIsActionValid(
 		{
 			w = gpGlobals->rgParty[i].wPlayerRole;
 
-#ifndef PAL_CLASSIC
-			if (gpGlobals->g.PlayerRoles.rgwHP[w] < gpGlobals->g.PlayerRoles.rgwMaxHP[w] / 5 ||
-				gpGlobals->rgPlayerStatus[w][kStatusSleep] != 0 ||
-				gpGlobals->rgPlayerStatus[w][kStatusConfused] != 0 ||
-				gpGlobals->rgPlayerStatus[w][kStatusSilence] != 0 ||
-				g_Battle.rgPlayer[i].flTimeMeter < 100 ||
-				g_Battle.rgPlayer[i].state == kFighterAct)
-#else
 			if (PAL_IsPlayerDying(w) || !PAL_New_IfPlayerCanMove(w))
-#endif
 			{
 				return FALSE;
 			}
@@ -118,27 +109,6 @@ VOID CUIBattle::PAL_BattleUIShowText(
 	}
 }
 
-VOID CUIBattle::PAL_BattleUIPlayerReady(
-	WORD          wPlayerIndex
-)
-/*++
-  Purpose:
-
-  Start the action selection menu of the specified player.
-  开始选定角色的动作选择菜单。
-  Parameters:    [IN]  wPlayerIndex - the player index.
-  角色的序号
-  Return value:    None.
-  --*/
-{
-	//当即时对战界面状态为选择动作
-	g_Battle.UI.wCurPlayerIndex = wPlayerIndex;
-	g_Battle.UI.state = kBattleUISelectMove;
-	g_Battle.UI.wSelectedAction = 0;
-	g_Battle.UI.MenuState = kBattleMenuMain;
-
-}
-
 VOID CUIBattle::PAL_BattleUIUseItem(
 	VOID
 )
@@ -157,26 +127,22 @@ VOID CUIBattle::PAL_BattleUIUseItem(
 	{
 		if (wSelectedItem != 0)
 		{
-			g_Battle.UI.wActionType = kBattleActionUseItem;
+			g_Battle.UI.wActionType = BATTLEACTIONTYPE::kBattleActionUseItem;
 			g_Battle.UI.wObjectID = wSelectedItem;
 			// 如果选择的使用物品是应用于全部玩家角色
 			if (gpGlobals->g.rgObject[wSelectedItem].item.wFlags & kItemFlagApplyToAll)
 			{
-				g_Battle.UI.state = kBattleUISelectTargetPlayerAll;
+				g_Battle.UI.state = BATTLEUISTATE::kBattleUISelectTargetPlayerAll;
 			}
 			else // 如果选择的使用物品不是应用于全部玩家角色
 			{
-#ifdef PAL_CLASSIC
 				g_Battle.UI.wSelectedIndex = 0;
-#else
-				g_Battle.UI.wSelectedIndex = g_Battle.UI.wCurPlayerIndex;
-#endif
-				g_Battle.UI.state = kBattleUISelectTargetPlayer; // 界面的选择状态为选择目标玩家
+				g_Battle.UI.state = BATTLEUISTATE::kBattleUISelectTargetPlayer; // 界面的选择状态为选择目标玩家
 			}
 		}
 		else
 		{
-			g_Battle.UI.MenuState = kBattleMenuMain;
+			g_Battle.UI.MenuState = BATTLEMENUSTATE::kBattleMenuMain;
 		}
 	}
 }
@@ -197,22 +163,22 @@ VOID CUIBattle::PAL_BattleUIThrowItem(
 	{
 		if (wSelectedItem != 0)
 		{
-			g_Battle.UI.wActionType = kBattleActionThrowItem;// 动作状态为投掷物品
+			g_Battle.UI.wActionType = BATTLEACTIONTYPE::kBattleActionThrowItem;// 动作状态为投掷物品
 			g_Battle.UI.wObjectID = wSelectedItem;
 			// 如果选择的投掷物品是应用于全部敌人
 			if (gpGlobals->g.rgObject[wSelectedItem].item.wFlags & kItemFlagApplyToAll)
 			{
-				g_Battle.UI.state = kBattleUISelectTargetEnemyAll;
+				g_Battle.UI.state = BATTLEUISTATE::kBattleUISelectTargetEnemyAll;
 			}
 			else
 			{ // 如果选择的投掷物品是应用于单个敌人
 				g_Battle.UI.wSelectedIndex = g_Battle.UI.wPrevEnemyTarget;
-				g_Battle.UI.state = kBattleUISelectTargetEnemy;
+				g_Battle.UI.state = BATTLEUISTATE::kBattleUISelectTargetEnemy;
 			}
 		}
 		else
 		{
-			g_Battle.UI.MenuState = kBattleMenuMain;
+			g_Battle.UI.MenuState = BATTLEMENUSTATE::kBattleMenuMain;
 		}
 	}
 }
@@ -285,7 +251,6 @@ WORD CUIBattle::PAL_BattleUIPickAutoMagic(
 
 
 
-//#ifdef SHOW_DATA_IN_BATTLE
 VOID CUIBattle::PAL_New_BattleUIShowData(
 	VOID
 )
@@ -387,40 +352,6 @@ Purpose: 在战斗中显示一些数据。
 }
 //#endif
 
-VOID CUIBattle::PAL_BattleUIShowNum(
-	WORD           wNum,
-	PAL_POS        pos,
-	NUMCOLOR       color
-)
-/*++
-  Purpose:    Show a number on battle screen (indicates HP/MP change).
-  在战斗屏幕上显示数字（表示生命值和魔法值的变化）。
-  Parameters:    [IN]  wNum - number to be shown.
-  要显示的数字。
-  [IN]  pos - position of the number on the screen.
-  数字在屏幕上的位置。
-  [IN]  color - color of the number.
-  数字的颜色。
-  Return value:    None.
-  --*/
-{
-	int     i;
-
-	for (i = 0; i < BATTLEUI_MAX_SHOWNUM; i++)
-	{
-		if (g_Battle.UI.rgShowNum[i].wNum == 0)
-		{
-			g_Battle.UI.rgShowNum[i].wNum = wNum;
-			g_Battle.UI.rgShowNum[i].pos = PAL_XY(PAL_X(pos) - 15, PAL_Y(pos));
-			g_Battle.UI.rgShowNum[i].color = color;
-			g_Battle.UI.rgShowNum[i].dwTime = SDL_GetTicks_New();
-
-			break;
-		}
-	}
-}
-
-
 #ifdef SHOW_ENEMY_STATUS
 VOID CUIBattle::PAL_New_EnemyStatus(
 	VOID
@@ -456,13 +387,13 @@ VOID CUIBattle::PAL_New_EnemyStatus(
 		//ClearScreen();
 		//显示怪物图片
 		int x__pos = PAL_RLEGetWidth(PAL_SpriteGetFrame(
-			g_Battle.rgEnemy[iCurrent].lpSprite,
+			g_Battle.rgEnemy[iCurrent].lpSprite.data(),
 			g_Battle.rgEnemy[iCurrent].wCurrentFrame)) / 2;
 		int y__pos = PAL_RLEGetHeight(PAL_SpriteGetFrame(
-			g_Battle.rgEnemy[iCurrent].lpSprite,
+			g_Battle.rgEnemy[iCurrent].lpSprite.data(),
 			g_Battle.rgEnemy[iCurrent].wCurrentFrame)) / 2;
 		PAL_RLEBlitWithColorShift(PAL_SpriteGetFrame(
-			g_Battle.rgEnemy[iCurrent].lpSprite,
+			g_Battle.rgEnemy[iCurrent].lpSprite.data(),
 			g_Battle.rgEnemy[iCurrent].wCurrentFrame),
 			gpTextureReal, PAL_XY(160 - x__pos, 80 - y__pos), 2);
 
@@ -637,8 +568,7 @@ VOID CUIBattle::PAL_New_EnemyStatus(
 			{
 				PAL_DrawText(PAL_GetWord(w), PAL_XY(195, y),
 					(BYTE)(gpGlobals->g.rgObject[w].poison.wColor + 10), TRUE, FALSE);
-//#ifdef POISON_STATUS_EXPAND
-				if (ggConfig->m_Function_Set[0]) 
+				if (cfgPoisonUp)
 				{
 					INT  wPoisonIntensity = g_Battle.rgEnemy[iCurrent].rgPoisons[i].wPoisonIntensity;
 

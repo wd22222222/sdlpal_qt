@@ -126,7 +126,7 @@ public:
 	static QVector<uint> sdl_PaltteToQColorList(SDL_Color* colors);
 	static uint sdl_colorToUint(const SDL_Color&);
 	static PalErr setCorrectDir(std::string& dir,bool change = false );
-	LPPALMAP m_pPalMap{};
+	//LPPALMAP m_pPalMap{};
 
 	PalErr EncodeRLE(const void* Source, const UINT8 TransparentColor, INT32 Stride, INT32 Width, INT32 Height, void*& Destination, INT32& Length);
 	VOID PAL_Object_classify(VOID);
@@ -134,19 +134,19 @@ public:
 	//Mark The script jumps to the address
 	//输入 跳转地址引用
 	//返回下一跳地址，为0 结束，jumps 不为0返回三个跳转地址
-	INT MarkSprictJumpsAddress(WORD spriptEntry, MAPScript& mMaps);
+	INT MarkSprictJumpsAddress(WORD spriptEntry, MAPScript& mMaps)const;
 
-	INT PAL_MarkScriptAll();
+	INT PAL_MarkScriptAll(PMARK & pMark)const;
 
 	//标记具体的有效脚本地址
 	//参数1 入口，参数2 要标记的脚本号列表
-	VOID PAL_MarkScriptEntryAll(WORD Entry, const gMARK& mark, int save);
+	VOID PAL_MarkScriptEntryAll(WORD Entry, const gMARK& mark, int save,PMARK &pmark)const;
 	// 替换mkf文件中的一个片段，
-	int replaceMKFOne(ByteArray* f, int nNum, LPCVOID buf, int BufLen);
+	int replaceMKFOne(ByteArray* f, int nNum, LPCVOID buf, int BufLen)const;
 	//
-	PalErr SingleScriptChange(int sOld, int sNew,MAPScript & st);
+	PalErr SingleScriptChange(int sOld, int sNew,MAPScript & st)const;
 	//测试文件流是否使用YJ_!压缩
-	INT isUseYJ_1(const ByteArray& fp);
+	INT isUseYJ_1(const ByteArray& fp)const;
 	//
 	void doSaveMapTilesToArray(int iMapNum);
 	//重写函数

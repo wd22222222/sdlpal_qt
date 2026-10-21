@@ -212,12 +212,10 @@ BOOL CGameUI::PAL_SystemMenu(
 	int                 iSlot, i, iSavedTimes;
 	FILE* fp;
 	const SDL_Rect      rect = { 40, 60, 100, 135 };
-	//auto& gConfig = gpGlobals->gConfig;
 
 	//
 	// Create menu items
 	//
-#ifdef PAL_CLASSIC
 	MENUITEM        rgSystemMenuItem[5] =
 	{
 		// value  label                      enabled   pos
@@ -227,18 +225,6 @@ BOOL CGameUI::PAL_SystemMenu(
 		{4, SYSMENU_LABEL_SOUND, TRUE, PAL_XY(53, 72 + 54),{64,16}},
 		{5, SYSMENU_LABEL_QUIT, TRUE, PAL_XY(53, 72 + 72),{64,16}},
 	};
-#else
-	MENUITEM        rgSystemMenuItem[6] =
-	{
-		// value  label                      enabled   pos
-		{ 1,      SYSMENU_LABEL_SAVE,        TRUE,     PAL_XY(53, 72),{64,16} },
-		{ 2,      SYSMENU_LABEL_LOAD,        TRUE,     PAL_XY(53, 72 + 18),{64,16} },
-		{ 3,      SYSMENU_LABEL_MUSIC,       TRUE,     PAL_XY(53, 72 + 36),{64,16} },
-		{ 4,      SYSMENU_LABEL_SOUND,       TRUE,     PAL_XY(53, 72 + 54),{64,16} },
-		{ 5,      SYSMENU_LABEL_BATTLEMODE,  TRUE,     PAL_XY(53, 72 + 72),{64,16} },
-		{ 6,      SYSMENU_LABEL_QUIT,        TRUE,     PAL_XY(53, 72 + 90),{64,16} },
-	};
-#endif
 
 	//
 	// Create the menu box.
@@ -290,16 +276,13 @@ BOOL CGameUI::PAL_SystemMenu(
 			iSavedTimes = 0;
 			// Determine the current saved times
 			//
-			int maxSaveFile = ggConfig->m_Function_Set[47] + 
-				ggConfig->m_Function_Set[53];
-			for (i = ggConfig->m_Function_Set[53]; i < maxSaveFile; i++)
+			for (i = cfgAutoSave; i < SAVEFILES; i++)
 			{
 				if (!gpGlobals->rgSaveData.at(i).empty())
                     iSavedTimes = std::max(iSavedTimes, (int)*((WORD*)gpGlobals->rgSaveData.at(i).data()));
 			}
 		
-			gpGlobals->PAL_SaveGame(iSlot,
-				iSavedTimes + 1,p_DataCopy != nullptr);
+			gpGlobals->PAL_SaveGame(iSlot,iSavedTimes + 1,p_DataCopy != nullptr);
 		}
 		break;
 
@@ -332,18 +315,7 @@ BOOL CGameUI::PAL_SystemMenu(
 		gAudioData.NoSound = !PAL_SwitchMenu(!gAudioData.NoSound);
 		break;
 
-#ifndef PAL_CLASSIC
 	case 5:
-		//
-		// Battle Mode
-		//
-		PAL_BattleSpeedMenu();
-		break;
-
-	case 6:
-#else
-	case 5:
-#endif
 		//
 		// Quit
 		//
@@ -351,7 +323,6 @@ BOOL CGameUI::PAL_SystemMenu(
 		{
 			PAL_PlayMUS(0, FALSE, 2);
 			PAL_FadeOut(2);
-			//PAL_Shutdown();
 			PalQuit = TRUE;
 		}
 		break;
@@ -702,7 +673,6 @@ VOID CGameUI::PAL_PlayerStatus(
 {
 	PAL_LARGE BYTE   bufBackground[PictureWidth * PictureHeight];
 	PAL_LARGE BYTE   bufImage[16384];
-	//auto& gConfig = gpGlobals->gConfig;
 
 	auto& gpSpriteUI = gpGlobals->gpSpriteUI;
 
@@ -832,9 +802,7 @@ VOID CGameUI::PAL_PlayerStatus(
 		//
 		y = 58;
 
-//#ifdef POISON_STATUS_EXPAND
 		int wPoisonIntensity = 0;
-//#endif
 
 		for (i = 0; i < MAX_POISONS; i++)
 		{
@@ -851,8 +819,7 @@ VOID CGameUI::PAL_PlayerStatus(
 					PAL_DrawText(PAL_GetWord(w), PAL_XY(260, y),
 						(BYTE)(gpGlobals->g.rgObject[w].poison.wColor + 10), TRUE, FALSE);
 
-//#ifdef POISON_STATUS_EXPAND
-					if (ggConfig->m_Function_Set[0]) {
+					if (cfgPoisonUp) {
 						wPoisonIntensity = gpGlobals->rgPoisonStatus[i][iCurrent].wPoisonIntensity;
 						if (wPoisonIntensity != 0)
 						{
@@ -869,8 +836,7 @@ VOID CGameUI::PAL_PlayerStatus(
 					PAL_DrawText(PAL_GetWord(w), PAL_XY(185, y),
 						(BYTE)(gpGlobals->g.rgObject[w].poison.wColor + 10), TRUE, FALSE);
 
-//#ifdef POISON_STATUS_EXPAND
-					if (ggConfig->m_Function_Set[0])
+					if (cfgPoisonUp)
 					{
 						wPoisonIntensity = gpGlobals->rgPoisonStatus[i][iCurrent].wPoisonIntensity;
 						if (wPoisonIntensity != 0)
@@ -1318,8 +1284,7 @@ VOID CGameUI::PAL_BuyMenu(
 	int             i, y;
 	WORD            w;
 	SDL_Rect        rect = { 125, 8, 190, 190 };
-	//auto gConfig = gpGlobals->gConfig;
-
+	
 	//
 	// create the menu items
 	//
@@ -1377,7 +1342,7 @@ VOID CGameUI::PAL_BuyMenu(
 		if (wStoreNum == 0)
 		{
 			//将灵狐炼丹改为商店购买方式
-			if (ggConfig->m_Function_Set[4])			
+			if (cfgGourdToShop)
 				w = PAL_ReadMenu(rgMenuItem, i, w, MENUITEM_COLOR,
 				std::bind(&CGameUI::PAL_BuyMenu_OnCollectValueChange, this, std::placeholders::_1));
 		}
@@ -1392,7 +1357,7 @@ VOID CGameUI::PAL_BuyMenu(
 
 		if (wStoreNum == 0)
 		{	
-			if (ggConfig->m_Function_Set[4])
+			if (cfgGourdToShop)
 			{
 				//将灵狐炼丹改为商店购买方式
 				for (y = 0; y < i && w != rgMenuItem[y].wValue; y++);
@@ -1876,7 +1841,6 @@ WORD CGameUI::PAL_ItemSelectMenu(
 	int              iPrevIndex;
 	WORD             w;
 	DWORD            dwTime;
-	//auto gConfig = gpGlobals->gConfig;
 	isInScene = FALSE;
 	PAL_ItemSelectMenuInit(wItemFlags);
 	iPrevIndex = gpGlobals->iCurInvMenuItem;
@@ -1914,7 +1878,7 @@ WORD CGameUI::PAL_ItemSelectMenu(
 			SDL_Delay(5);
 		}
 
-		dwTime = SDL_GetTicks_New() + ggConfig->m_Function_Set[24];
+		dwTime = SDL_GetTicks_New() + cfgBtlFrameMs;
 
 		if (w != 0xFFFF)
 		{
@@ -2259,7 +2223,7 @@ WORD CGameUI::PAL_MagicSelectionMenu(
 			SDL_Delay(1);
 		}
 
-		dwTime = SDL_GetTicks_New() + FRAME_TIME;
+		dwTime = SDL_GetTicks_New() + cfgBtlFrameMs;
 	}
 
 	return 0; // should not really reach here
@@ -2306,9 +2270,9 @@ WORD CGameUI::PAL_MagicSelectionMenuUpdate(
 	PAL_CreateBox(PAL_XY(10, 42), 4, 16, 1, FALSE);
 
 //#ifndef PAL_WIN95
-	if (!ggConfig->fIsWIN95)
+	if (!cfgIsWin95)
 	{
-		if (gpGlobals->lpObjectDesc == NULL)
+		if (gpGlobals->rgObjectDesc.empty())
 		{
 			//
 			// Draw the cash amount.
@@ -2334,7 +2298,7 @@ WORD CGameUI::PAL_MagicSelectionMenuUpdate(
 				ClearScreen(&dRect);
 			}
 			char szDesc[512], * next;
-			std::string dstring = PAL_GetObjectDesc(gpGlobals->lpObjectDesc, rgMagicItem[g_iCurrentItem].wMagic).c_str();
+			std::string dstring = PAL_GetObjectDesc(gpGlobals->rgObjectDesc, rgMagicItem[g_iCurrentItem].wMagic).c_str();
 
 			//
 			// Draw the magic description.
@@ -2747,12 +2711,12 @@ WORD CGameUI::PAL_ItemSelectMenuUpdate(VOID)
 	//
 	// Draw the description of the selected item
 	//
-	if (!ggConfig->fIsWIN95)
+	if (!cfgIsWin95)
 	{
-		if (!g_fNoDesc && gpGlobals->lpObjectDesc != NULL)
+		if (!g_fNoDesc && gpGlobals->rgObjectDesc.size())
 		{
 			char szDesc[512], * next;
-			std::string dstring = PAL_GetObjectDesc(gpGlobals->lpObjectDesc, wObject);
+			std::string dstring = PAL_GetObjectDesc(gpGlobals->rgObjectDesc, wObject);
 			
 			SDL_Rect dRect = { 75,150,320,200 };
 			ClearScreen(&dRect);
@@ -3276,7 +3240,6 @@ VOID CGameUI::PAL_UpdateEquipments(
 {
 	int      i, j;
 	WORD     w;
-	//auto& gConfig = gpGlobals->gConfig;
 
 	memset(&(gpGlobals->rgEquipmentEffect), 0, sizeof(gpGlobals->rgEquipmentEffect));
 

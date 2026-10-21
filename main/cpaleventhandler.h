@@ -7,6 +7,12 @@
 #include <unordered_map>
 #include "command.h"
 
+// maximum number of enemies in a team
+#define     MAX_ENEMIES_IN_TEAM          5
+// maximum number of players in party
+#define     MAX_PLAYERS_IN_PARTY         5
+
+
 
 enum PALKEY
 {
@@ -27,13 +33,8 @@ enum PALKEY
 	kKeyStatus = (1 << 14),
 	kKeyForce = (1 << 15),
 
-//#ifdef  SHOW_DATA_IN_BATTLE
 	kKeyGetInfo = (1 << 16),
-//#endif
-
-#ifdef  SHOW_ENEMY_STATUS
 	kKeyEnemyInfo = (1 << 17),
-#endif // SHOW_ENEMY_STATUS
 	//自动存档
 	kKeyAutoSave = (1 << 18),
 };
@@ -71,6 +72,9 @@ enum class eventTypeCustom {
 	//ogg音乐播放事件
 	eventOggMusicPlay,
 #endif
+	eventBattle,
+	eventBattleEnd = eventBattle + MAX_PLAYERS_IN_PARTY + MAX_ENEMIES_IN_TEAM,
+
 	//自定义事件结止
 	eventTypeCustomEnd,
 };

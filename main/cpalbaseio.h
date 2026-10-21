@@ -1,18 +1,19 @@
+#pragma once
 #ifndef CPALBASEIO_H
 #define CPALBASEIO_H
 
 #include <functional>
+#include <memory>
 #include "cscreen.h"
 #include "command.h"
 #include "palsurface.h"
 
 #define MENUITEM_VALUE_CANCELLED		   0xFFFF
+//使用线程池
+#define USE_THREADPOOL					1
 
-//using namespace std;
-;
 typedef std::function<void(WORD)> LPITEMCHANGED_CALLBACK;
 
-//typedef VOID(CGameUI::*LPITEMCHANGED_CALLBACK)(WORD);
 
 typedef enum tagLOADRESFLAG
 {
@@ -23,7 +24,7 @@ typedef enum tagLOADRESFLAG
 typedef struct tagPALMAP
 {
 	DWORD          MapTiles[128][64][2]{};
-	LPSPRITE       pTileSprite{};
+	ByteArray      pTileSprite{};
 	INT            iMapNum{ -1 };
 
 } PALMAP, * LPPALMAP;
@@ -52,9 +53,7 @@ typedef struct tagBOX
 #define MENUITEM_VALUE_CANCELLED      0xFFFF
 
 
-
-
-typedef enum tagBATTLEUISTATE
+typedef enum class  tagBATTLEUISTATE
 {
 	kBattleUIWait,
 	kBattleUISelectMove,
@@ -64,7 +63,7 @@ typedef enum tagBATTLEUISTATE
 	kBattleUISelectTargetPlayerAll,
 } BATTLEUISTATE;
 
-typedef enum tagBATTLEMENUSTATE
+typedef enum class tagBATTLEMENUSTATE
 {
 	kBattleMenuMain,
 	kBattleMenuMagicSelect,
@@ -74,7 +73,7 @@ typedef enum tagBATTLEMENUSTATE
 	kBattleMenuMiscItemSubMenu,
 } BATTLEMENUSTATE;
 
-typedef enum //tagBATTLEUIACTION
+typedef enum class tagBATTLEUIACTION
 {
 	kBattleUIActionAttack,
 	kBattleUIActionMagic,
@@ -109,8 +108,6 @@ typedef enum //tagBATTLEUIACTION
 #define TIMEMETER_COLOR_SLOW             0x5B
 #define TIMEMETER_COLOR_HASTE            0x2A
 
-#define BATTLEUI_MAX_SHOWNUM             16
-
 typedef struct tagSHOWNUM
 {
 	WORD             wNum;
@@ -124,7 +121,7 @@ typedef enum tagBATTLERESULT
 	kBattleResultWon = 3,			// player won the battle
 	kBattleResultLost = 1,			// player lost the battle
 	kBattleResultStop = 2,			// player stop the battle
-	kBattleResultEnemyFleed = 0x7FFF,// 敌人逃跑
+	kBattleResultEnemyFleed = 0x7FFF,//The enemy is fleeing.
 	kBattleResultFleed = 0xFFFF,	// player fleed from the battle
 	kBattleResultTerminated = 0,	// battle terminated with scripts
 	kBattleResultOnGoing = 1000,	// the battle is ongoing
@@ -134,22 +131,24 @@ typedef enum tagBATTLERESULT
 } BATTLERESULT;
 
 
-typedef enum tagFIGHTERSTATE
+typedef enum class tagFIGHTERSTATE
 {
-	kFighterWait,  // waiting time
-	kFighterCom,   // accepting command
-	kFighterAct,   // doing the actual move
+	kFighterWait,		// waiting time 
+	kFighterCharging,	//Charging...
+	kFighterCom,		// accepting command
+	kFighterAct,		// doing the actual move
+	kFighterEnd,	    //end the actual move
 } FIGHTERSTATE;
 
-typedef enum tagBATTLEACTIONTYPE
+typedef enum class tagBATTLEACTIONTYPE
 {
 	kBattleActionPass,          // do nothing						无动作
 	kBattleActionDefend,        // defend							防御
 	kBattleActionAttack,        // physical attack					物攻
-	kBattleActionMagic,         // use magic							使用法术
-	kBattleActionCoopMagic,     // use cooperative magic				使用合体法术
+	kBattleActionMagic,         // use magic						使用法术
+	kBattleActionCoopMagic,     // use cooperative magic			使用合体法术
 	kBattleActionFlee,          // flee from the battle				逃跑
-	kBattleActionThrowItem,     // throw item onto enemy				投掷物品
+	kBattleActionThrowItem,     // throw item onto enemy			投掷物品
 	kBattleActionUseItem,       // use item							使用物品	
 	kBattleActionAttackMate,    // attack teammate (confused only)	攻击队友（疯魔状态下）
 } BATTLEACTIONTYPE;
@@ -161,8 +160,8 @@ typedef struct tagBATTLEUI
 
 	CHAR             szMsg[256];           // message to be shown on the screen
 	CHAR             szNextMsg[256];       // next message to be shown on the screen
-	DWORD            dwMsgShowTime;        // the end time of showing the message
 	WORD             wNextMsgDuration;     // duration of the next message
+	DWORD            dwMsgShowTime;        // the end time of showing the message
 
 	WORD             wCurPlayerIndex;      // index of the current player
 	WORD             wSelectedAction;      // current selected action
@@ -183,123 +182,102 @@ typedef struct tagBATTLEACTION
 	BATTLEACTIONTYPE   ActionType;
 	WORD               wActionID;   // item/magic to use
 	SHORT              sTarget;     // -1 for everyone
-	FLOAT              flRemainingTime;  // remaining waiting time before the action start
 } BATTLEACTION;
 
 typedef struct tagBATTLEENEMY
 {
-	WORD               wObjectID;              // Object ID of this enemy
-	ENEMY              e;                      // detailed data of this enemy
-	WORD               rgwStatus[kStatusAll];  // status effects
-	FLOAT              flTimeMeter;            // time-charging meter (0 = empty, 100 = full).
-	POISONSTATUS       rgPoisons[MAX_POISONS]; // poisons
-	LPSPRITE           lpSprite = NULL;
-	PAL_POS            pos;                    // current position on the screen
-	PAL_POS            posOriginal;            // original position on the screen
-	WORD               wCurrentFrame;          // current frame number
-	FIGHTERSTATE       state;                  // state of this enemy
-	BOOL               fTurnStart;
-	BOOL               fFirstMoveDone;
-	BOOL               fDualMove;
-	WORD               wScriptOnTurnStart;	//战前脚本,一般为战前的对话
-	WORD               wScriptOnBattleEnd;	//战后脚本，例如获得某某物品
-	WORD               wScriptOnReady;		//战时脚本，一般为敌人的出招脚本
-	DWORD              wPrevHP;				// HP value prior to action（改成DWORD类型了）
-	INT                iColorShift;
+	WORD               wObjectID{};					// Object ID of this enemy
+	ENEMY              e{};							// detailed data of this enemy
+	WORD               rgwStatus[kStatusAll]{};		// status effects
+	POISONSTATUS       rgPoisons[MAX_POISONS]{};	// poisons
+	PAL_POS            pos{};						// current position on the screen
+	PAL_POS            posOriginal{};				// original position on the screen
+	WORD               wCurrentFrame{};				// current frame number
+	FIGHTERSTATE       state{};						// state of this enemy
+	WORD               wScriptOnTurnStart{};		//Pre-war scripts, typically include pre-war dialogues
+	WORD               wScriptOnBattleEnd{};		//Post-war scripts, such as obtaining certain items
+	WORD               wScriptOnReady{};			//wartime scripts, generally referring to the enemy’s moves and strategies
+	DWORD              wPrevHP{};					// HP value prior to action（DWORD）
+	INT                iColorShift{};
 
-	DWORD              dwActualHealth;
-	DWORD              dwMaxHealth;
-	DWORD			   dwExp;//
+	DWORD              dwActualHealth{};
+	DWORD              dwMaxHealth{};
+	DWORD			   dwExp{};//
+	
+	//以下设置与即时战斗相关
+
+	int				   mMoveTimes{};				//The number of attacks the enemy makes per turn
+	int				   mCurrentMove{};				//The actual second attack by the enemy
+	FLOAT			   flTimeChargingSpeed{};		//Calculate the time charging speed.		
+	FLOAT			   flTimeMeter{};				//time-charging meter (0 = empty, 100 = full).
+
+	ByteArray          lpSprite{};					//
+	void clear()
+	{
+		memset(this, 0, sizeof(tagBATTLEENEMY) - sizeof(ByteArray));
+		lpSprite.clear();
+	};
 } BATTLEENEMY;
 
 // We only put some data used in battle here; other data can be accessed in the global data.
 typedef struct tagBATTLEPLAYER
 {
 	INT                iColorShift;
-	FLOAT              flTimeMeter;          // time-charging meter (0 = empty, 100 = full).
-	FLOAT              flTimeSpeedModifier;
-	WORD               wHidingTime;          // remaining hiding time
 	PAL_POS            pos;                  // current position on the screen
 	PAL_POS            posOriginal;          // original position on the screen
+	WORD               wHidingTime;          // remaining hiding time
 	WORD               wCurrentFrame;        // current frame number
 	FIGHTERSTATE       state;                // state of this player
 	BATTLEACTION       action;               // action to perform
 	BOOL               fDefending;           // TRUE if player is defending
-	INT				   fDefenAction;		 // The player action is defend 主动防御
+	INT				   fDefenAction;		 // The player action is defend 
 	INT				   fNotKillImmediately;  // Not Kill the player immediately
 	INT				   fBadStatus;			 //Set the bad status for player
 	WORD               wPrevHP;              // HP value prior to action
 	WORD               wPrevMP;              // MP value prior to action
-#ifndef PAL_CLASSIC
-	SHORT              sTurnOrder;           // turn order
-#endif
+	DWORD			   dwExpGained;			 //Experience points for individual players
+	//
+	FLOAT			   flTimeChargingSpeed;	 //Calculate the time charging speed.		
+	FLOAT			   flTimeMeter;			 //time-charging meter (0 = empty, 100 = full).
 
-#ifdef EDIT_EXP_CALCULATION
-	DWORD				dwExpGained;
-#endif
-	LPSPRITE           lpSprite;
+	ByteArray          lpSprite;			 //Player character
+
+	void clear()
+	{
+		memset(this, 0, sizeof(tagBATTLEPLAYER) - sizeof(ByteArray));
+		lpSprite.clear();
+	};
+
 } BATTLEPLAYER;
 
-typedef struct tagSUMMON
-{
-	LPSPRITE           lpSprite;
-	WORD               wCurrentFrame;
-} SUMMON;
 
-//#define MAX_BATTLE_ACTIONS    256
-//#define MAX_KILLED_ENEMIES    256
 
-#ifdef PAL_CLASSIC
-
-typedef enum tabBATTLEPHASE
+typedef enum class tabBATTLEPHASE
 {
 	kBattlePhaseSelectAction,
 	kBattlePhasePerformAction
 } BATTLEPHASE;
 
-typedef enum tabACTIONQUEUETYPE
-{
-	kActionQueueTypeEmpty,
-	kActionQueueTypeEnemy,
-	kActionQueueTypePlayer,
-} ACTIONQUEUETYPE;
 
 typedef struct tagACTIONQUEUE
 {
 	BOOL		fIsEmpty;
-	BOOL       fIsEnemy;
+	BOOL		fIsEnemy;
 	DWORD       wDexterity;
-	WORD       wIndex;
+	int 		wIndex;
 } ACTIONQUEUE;
 
-#define MAX_ACTIONQUEUE_ITEMS (MAX_PLAYERS_IN_PARTY + MAX_ENEMIES_IN_TEAM * ENEMY_MAX_MOVE)
+#define MAX_ACTIONQUEUE_ITEMS (MAX_PLAYERS_IN_PARTY + MAX_ENEMIES_IN_TEAM)
 
-#endif
-
-typedef struct tagMENGSHECOUNT
-{
-	WORD			MaxHP;
-	WORD			MaxMP;
-	WORD			AttackStrength;
-	WORD			MagicStrength;
-	WORD			Defense;
-	WORD			Dexterity;
-	WORD			FleeRate;
-} MENGSHECOUNT;
 
 typedef struct tagBATTLE
 {
-	BATTLEPLAYER     rgPlayer[MAX_PLAYERS_IN_PARTY];
-	BATTLEENEMY      rgEnemy[MAX_ENEMIES_IN_TEAM];
 
 	WORD             wMaxEnemyIndex;
 
-	PalTexture   lpSceneBuf{};			//战斗画面的图层，包括角色、敌人
-	PalSurface	 lpBackground{};			//战斗中地图画面的图层
 
 	SHORT            sBackgroundColorShift;
 
-	LPSPRITE         lpSummonSprite;       // sprite of summoned god
 	PAL_POS          posSummon;
 	INT              iSummonFrame;         // current frame of the summoned god
 
@@ -310,17 +288,13 @@ typedef struct tagBATTLE
 	BOOL             fEnemyCleared;        // TRUE if enemies are cleared
 	BATTLERESULT     BattleResult;
 
-	FLOAT            flTimeChargingUnit;   // the base waiting time unit
-
 	BATTLEUI         UI;
 
-	LPBYTE           lpEffectSprite;
-
+	
 	BOOL             fEnemyMoving;         // TRUE if enemy is moving
 
 	BOOL             fPlayerMoving;         // TRUE if player is moving
 
-	INT              iHidingTime;          // Time of hiding
 
 	WORD             wMovingPlayerIndex;   // current moving player index
 
@@ -328,17 +302,72 @@ typedef struct tagBATTLE
 
 	int              iBlow;
 
-#ifdef PAL_CLASSIC
+
 	BATTLEPHASE      Phase;
-	ACTIONQUEUE      ActionQueue[MAX_ACTIONQUEUE_ITEMS];
-	int              iCurAction;
 	BOOL             fRepeat;              // TRUE if player pressed Repeat
 	BOOL             fForce;               // TRUE if player pressed Force
 	BOOL             fFlee;                // TRUE if player pressed Flee
-#endif
-	BOOL    g_ifUseMenshe[MAX_PLAYER_ROLES]{ 0 };//使用梦蛇后，各项属性增加
-} BATTLE;
 
+	BOOL			 g_ifUseMenshe[MAX_PLAYER_ROLES];	//使用梦蛇后，各项属性增加
+
+	FLOAT            flTimeChargingUnit{};					// the base waiting time unit
+	
+	
+	//以下结构含不能直接通过memset清零
+
+#define  BattleMemsetSize  (sizeof(struct tagBATTLE) -		\
+		sizeof(BATTLEPLAYER) * MAX_PLAYERS_IN_PARTY -		\
+		sizeof(BATTLEENEMY) * MAX_ENEMIES_IN_TEAM -			\
+		sizeof(PalTexture) * 2 -							\
+		sizeof(ByteArray) * 3)
+
+
+	BATTLEPLAYER     rgPlayer[MAX_PLAYERS_IN_PARTY]{};		//
+
+	BATTLEENEMY      rgEnemy[MAX_ENEMIES_IN_TEAM]{};		//
+
+	PalTexture		 lpSceneBuf{};							//战斗画面的图层，包括角色、敌人
+
+	PalTexture		 lpBackground{};						//战斗中地图画面的图层
+
+	ByteArray        lpEffectSprite{};					    //战斗效果精灵图。
+
+	std::vector<PalTexture> spriteList{};					//进度条精灵列表
+	
+	ByteArray        lpSummonSprite{};						// sprite of summoned god
+
+	void clear()											//初始化结构
+	{
+		memset(this, 0, BattleMemsetSize);
+		clearBATTLEPLAYER();
+		clearrBATTLEENEMY();
+		lpSceneBuf.clear();
+		lpBackground.clear();
+		spriteList.clear();
+		lpSummonSprite.clear();
+	}
+
+	void clearBATTLEPLAYER()								//初始化 BATTLEPLAYER 结构
+	{
+		for (int i = 0; i < MAX_PLAYERS_IN_PARTY; i++)
+			rgPlayer[i].clear();
+	}
+	void clearrBATTLEENEMY()								//初始化 BATTLEENEMY  结构
+	{
+		for (int i = 0; i < MAX_ENEMIES_IN_TEAM; i++)
+			rgEnemy[i].clear();
+	}
+} 
+BATTLE;
+
+typedef struct tagRESOURCES
+{
+	int              bLoadFlags{};
+	int              nEventObject{};										// number of event objects
+	std::vector<ByteArray>	 lppEventObjectSprites{};						// event object sprites
+	ByteArray        rglpPlayerSprite[MAX_PLAYERS_IN_PARTY + 1]{};			// player sprites
+	std::unique_ptr<PALMAP>    lpMap{};                                     // current loaded map
+} RESOURCES;
 
 
 //本类是游戏底层与上层之间的中间层
@@ -394,35 +423,31 @@ public:
 	LPBOX PAL_CreateSingleLineBox(PAL_POS pos, INT nLen, BOOL fSaveScreen);
 
 	//cres.cpp
-	typedef struct tagRESOURCES
-	{
-		BYTE             bLoadFlags{};
-		LPPALMAP         lpMap{};                                      // current loaded map
-		LPSPRITE* lppEventObjectSprites{};                      // event object sprites
-		int              nEventObject{};                               // number of event objects
-		LPSPRITE         rglpPlayerSprite[MAX_PLAYERS_IN_PARTY + 1]; // player sprites
-	} RESOURCES, * LPRESOURCES;
 public:
-	LPRESOURCES gpResources = NULL;
-    // Add a forward declaration for the RESOURCES struct to resolve the type issue.  
-    struct tagRESOURCES;
+	std::unique_ptr<RESOURCES> gpResources{};
+
 public:
 	//cres.cpp
-	VOID PAL_InitResources(VOID);
-	VOID PAL_FreeResources(VOID);
 	VOID PAL_SetLoadFlags(BYTE bFlags);
 	VOID PAL_LoadResources(VOID);
-	LPPALMAP PAL_GetCurrentMap(VOID);
-	LPSPRITE PAL_GetPlayerSprite(BYTE bPlayerIndex);
-	LPSPRITE PAL_GetEventObjectSprite(WORD wEventObjectID);
-	WORD PAL_SpriteGetNumFrames(LPCSPRITE lpSprite);
+	LPPALMAP PAL_GetCurrentMap()const;
+	LPCSPRITE PAL_GetPlayerSprite(BYTE bPlayerIndex)const;
+	LPCSPRITE PAL_GetEventObjectSprite(WORD wEventObjectID)const;
+	WORD PAL_SpriteGetNumFrames(LPCSPRITE lpSprite)const;
+	WORD PAL_SpriteGetNumFrames(ByteArray& const lpSprite)const
+	{
+		return PAL_SpriteGetNumFrames(lpSprite.data());
+	};
 private:
+	VOID PAL_InitResources(VOID);
+	VOID PAL_FreeResources(VOID);
+
 public:
-	VOID PAL_FreeEventObjectSprites(VOID);
-	VOID PAL_FreePlayerSprites(VOID);
+	//VOID PAL_FreeEventObjectSprites(LPRESOURCES  const p)const;
+	//VOID PAL_FreePlayerSprites(LPRESOURCES  const p)const;
 	//cplayer.cpp
 	BOOL PAL_AddItemToInventory(WORD wObjectID, INT iNum);
-	INT  PAL_GetItemAmount(WORD wItem);
+	const  INT  PAL_GetItemAmount(WORD wItem)const;
 	BOOL PAL_IncreaseHPMP(WORD wPlayerRole, SHORT sHP, SHORT sMP);
 	VOID PAL_RemoveEquipmentEffect(WORD wPlayerRole, WORD wEquipPart);
 	VOID PAL_AddPoisonForPlayer(WORD wPlayerRole, WORD wPoisonID);
@@ -430,21 +455,26 @@ public:
 	VOID PAL_CurePoisonByLevel(WORD wPlayerRole, WORD wMaxLevel);
 	BOOL PAL_New_IsAnItemInArray(WORD item, const WORD items[]);
 	BOOL PAL_IsPlayerPoisonedByLevel(WORD wPlayerRole, WORD wMinLevel);
-	INT  PAL_New_GetPoisonIndexForPlayer(WORD wPlayerRole, WORD wPoisonID);
-	BOOL PAL_New_IsPlayerPoisoned(WORD wPlayerRole);
 	VOID PAL_New_SortPoisonsForPlayerByLevel(WORD wPlayerRole);
-	WORD PAL_GetPlayerAttackStrength(WORD wPlayerRole);
-	WORD PAL_GetPlayerMagicStrength(WORD wPlayerRole);
-	WORD PAL_GetPlayerDefense(WORD wPlayerRole);
-	WORD PAL_GetPlayerDexterity(WORD wPlayerRole);
-	WORD PAL_GetPlayerFleeRate(WORD wPlayerRole);
-	WORD PAL_GetPlayerPoisonResistance(WORD wPlayerRole);
-	WORD PAL_New_GetPlayerSorceryResistance(WORD wPlayerRole);
-	WORD PAL_New_GetPlayerSorceryStrength(WORD wPlayerRole);
-	WORD PAL_GetPlayerElementalResistance(WORD wPlayerRole, INT iAttrib);
-	WORD PAL_New_GetPlayerPhysicalResistance(WORD wPlayerRole);
-	WORD PAL_GetPlayerBattleSprite(WORD wPlayerRole);
-	WORD PAL_GetPlayerCooperativeMagic(WORD wPlayerRole);
+	const  INT  PAL_New_GetPoisonIndexForPlayer(WORD wPlayerRole, WORD wPoisonID)const ;
+	const  BOOL PAL_New_IsPlayerPoisoned(WORD wPlayerRole)const;
+	const  WORD PAL_GetPlayerAttackStrength(WORD wPlayerRole)const;
+	const  WORD PAL_GetPlayerMagicStrength(WORD wPlayerRole)const;
+	const  WORD PAL_GetPlayerDefense(WORD wPlayerRole) const;
+	const  WORD PAL_GetPlayerDexterity(WORD wPlayerRole)const ;
+	const  WORD PAL_GetPlayerFleeRate(WORD wPlayerRole) const;
+	const  WORD PAL_GetPlayerPoisonResistance(WORD wPlayerRole)const;
+	const  WORD PAL_New_GetPlayerSorceryResistance(WORD wPlayerRole)const;
+	const  WORD PAL_New_GetPlayerSorceryStrength(WORD wPlayerRole)const;
+	const  WORD PAL_GetPlayerElementalResistance(WORD wPlayerRole, INT iAttrib)const;
+	const  WORD PAL_New_GetPlayerPhysicalResistance(WORD wPlayerRole)const;
+	const  WORD PAL_GetPlayerBattleSprite(WORD wPlayerRole)const;
+	const  WORD PAL_GetPlayerCooperativeMagic(WORD wPlayerRole)const;
+	const  INT PAL_New_GetPlayerIndex(WORD wPlayerRole)const;
+	const  WORD PAL_New_GetPlayerID(WORD wPlayerIndex)const;
+	const  INT PAL_New_GetPlayerIndexByPara(PlayerPara pp, BOOL fGetLowest)const;
+	const  INT PAL_New_GetPlayerIndexByHealth(BOOL fGetLowest)const;
+	const  BOOL PAL_New_IfPlayerCanMove(WORD wPlayerRole)const;
 	BOOL PAL_PlayerCanAttackAll(WORD wPlayerRole);
 	BOOL PAL_AddMagic(WORD wPlayerRole, WORD wMagic);
 	VOID PAL_RemoveMagic(WORD wPlayerRole, WORD wMagic);
@@ -453,23 +483,22 @@ public:
 	VOID PAL_New_RemovePlayerAllStatus(WORD wPlayerRole);
 	VOID PAL_ClearAllPlayerStatus(VOID);
 	//VOID PAL_PlayerLevelUp(WORD wPlayerRole, WORD wNumLevel);
-	INT PAL_New_GetPlayerIndex(WORD wPlayerRole);
-	WORD PAL_New_GetPlayerID(WORD wPlayerIndex);
-	INT PAL_New_GetPlayerIndexByPara(PlayerPara pp, BOOL fGetLowest);
-	INT PAL_New_GetPlayerIndexByHealth(BOOL fGetLowest);
-	BOOL PAL_New_GetTrueByPercentage(WORD wPercentage);
-	DWORD PAL_New_GetLevelUpBaseExp(WORD wLevel);
-	DWORD PAL_New_GetLevelUpExp(WORD wLevel);
-	BOOL PAL_New_IfPlayerCanMove(WORD wPlayerRole);
+	BOOL PAL_New_GetTrueByPercentage(WORD wPercentage)const;
+	DWORD PAL_New_GetLevelUpBaseExp(WORD wLevel)const;
+	DWORD PAL_New_GetLevelUpExp(WORD wLevel)const;
+	//hidingtime
+	INT PAL_GetHidingTime()const;
+	VOID PAL_SetHidingTime(int hide);
+	VOID PAL_UpdateHidingTime(int play);
 
 	//cmap.cpp
-	LPPALMAP  PAL_LoadMap(INT iMapNum, ByteArray& fpMapMKF, ByteArray& fpGopMKF);
-	VOID PAL_FreeMap(LPPALMAP lpMap);
-	LPCBITMAPRLE PAL_MapGetTileBitmap(BYTE x, BYTE y, BYTE h, BYTE ucLayer, LPCPALMAP lpMap);
-	BOOL PAL_MapTileIsBlocked(BYTE x, BYTE y, BYTE h, LPCPALMAP lpMap);
-	BYTE PAL_MapGetTileHeight(BYTE x, BYTE y, BYTE h, BYTE ucLayer, LPCPALMAP lpMap);
-	VOID PAL_MapBlitToSurface(LPCPALMAP lpMap, SDL_Surface* lpSurface, const SDL_Rect* lpSrcRect, BYTE ucLayer);
-	VOID PAL_MapBlitToSurface(LPCPALMAP lpMap, PalTexture& lpSurface, const SDL_Rect* lpSrcRect, BYTE ucLayer);
+	std::unique_ptr <PALMAP> PAL_LoadMap(INT iMapNum, const ByteArray& fpMapMKF, const ByteArray& fpGopMKF)const;
+	VOID PAL_FreeMap(LPPALMAP &lpMap)const;
+	LPCBITMAPRLE PAL_MapGetTileBitmap(BYTE x, BYTE y, BYTE h, BYTE ucLayer, LPCPALMAP lpMap)const;
+	BOOL PAL_MapTileIsBlocked(BYTE x, BYTE y, BYTE h, LPCPALMAP lpMap)const;
+	BYTE PAL_MapGetTileHeight(BYTE x, BYTE y, BYTE h, BYTE ucLayer, LPCPALMAP lpMap)const;
+	VOID PAL_MapBlitToSurface(LPCPALMAP lpMap, SDL_Surface* lpSurface, const SDL_Rect* lpSrcRect, BYTE ucLayer)const;
+	VOID PAL_MapBlitToSurface(LPCPALMAP lpMap, PalTexture& lpSurface, const SDL_Rect* lpSrcRect, BYTE ucLayer)const;
 };
 
 #endif // CPALBASEIO_H

@@ -60,15 +60,15 @@ INT deployMap::MakeMapImage(QImage& mm, const DWORD flag)
 	m.fill(m_Pal->sdl_colorToUint( m_Pal->pal->gpPalette->colors[0]));
 	PAL_Rect rect = { 0,0,MapPixWidth,MapPixHight };
 	//画底层
-	m_Pal->PAL_MapBlitToSurface(m_Pal->m_pPalMap, m, &rect, 0);
+	m_Pal->PAL_MapBlitToSurface(m_Pal->pal->gpResources->lpMap.get(), m, &rect, 0);
 	//画顶层
-	m_Pal->PAL_MapBlitToSurface(m_Pal->m_pPalMap, m, &rect, 1);
+	m_Pal->PAL_MapBlitToSurface(m_Pal->pal->gpResources->lpMap.get(), m, &rect, 1);
 	//画全部对象
 	//
 	// Event Objects (Monsters/NPCs/others)
 	//
 	int i, x, y, vy;
-	auto gpGlobals = m_Pal->pal->gpGlobals;
+	auto const gpGlobals = m_Pal->pal->gpGlobals.get();
 	for (i = gpGlobals->g.rgScene[iScene - 1].wEventObjectIndex;
 		i < gpGlobals->g.rgScene[iScene].wEventObjectIndex; i++)
 	{
@@ -284,7 +284,7 @@ deployMap::~deployMap()
 		//保存修改，g.lprgEventObject有改动
 		m_Pal->saveGameDataToCache();
 		auto& s_RowData = s_Data.d_Array;
-		auto p = m_Pal->pal->gpGlobals;
+		auto p = m_Pal->pal->gpGlobals.get();
 		auto n_Row = p->g.rgScene[iScene - 1].wEventObjectIndex ;
 		auto& rowData = m_pData->d_Array;
 		//以下更新主表数据
@@ -302,14 +302,14 @@ void deployMap::makeALL()
 {
 	//准备工作设置数据
 	const int totalCol = 4;
-	auto g = m_Pal->pal->gpGlobals;
+	auto g = m_Pal->pal->gpGlobals.get();
 	g->wNumScene = iScene;
 	if (!m_Pal->pal->gpResources)
-		m_Pal->pal->gpResources = new CPalBaseIO::RESOURCES;
+		m_Pal->pal->gpResources = std::make_unique< RESOURCES>();
 	m_Pal->pal->PAL_SetPalette(0, 0);
 	m_Pal->pal->PAL_SetLoadFlags(kLoadScene | kLoadPlayerSprite);
 	m_Pal->pal->PAL_LoadResources();
-	m_Pal->m_pPalMap = m_Pal->pal->gpResources->lpMap;
+
 	auto iMapNum = g->g.rgScene[iScene - 1].wMapNum;
 	{
 		QString text = QString::asprintf("在地图上部署 场景号 %d 地图号 %d", iScene, iMapNum);

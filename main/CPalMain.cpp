@@ -7,8 +7,8 @@
 #include "cpaldata.h"
 using namespace std;
 
-#define BITMAPNUM_SPLASH_UP         (ggConfig->fIsWIN95 ? 0x03 : 0x26)
-#define BITMAPNUM_SPLASH_DOWN       (ggConfig->fIsWIN95 ? 0x04 : 0x27)
+#define BITMAPNUM_SPLASH_UP         (cfgIsWin95 ? 0x03 : 0x26)
+#define BITMAPNUM_SPLASH_DOWN       (cfgIsWin95 ? 0x04 : 0x27)
 #define SPRITENUM_SPLASH_TITLE      0x47
 #define SPRITENUM_SPLASH_CRANE      0x49
 #define NUM_RIX_TITLE               0x05
@@ -32,7 +32,7 @@ CPalMain::~CPalMain()
 int CPalMain::PAL_TrademarkScreen()
 //运行启动动画1
 {
-    if (ggConfig->fEnableAviPlay)
+    if (cfgUseAVI)
     {
         CAviPlay m;
         if (m.PAL_PlayAVI("avi/1.avi")) return 0;
@@ -63,7 +63,7 @@ int CPalMain::PAL_SplashScreen()
 --*/
 {
     //use avi
-    if (ggConfig->fEnableAviPlay)
+    if (cfgUseAVI)
     {
         CAviPlay m;
         if (m.PAL_PlayAVI("avi/2.avi"))
@@ -310,7 +310,7 @@ VOID CPalMain::PAL_GameMain(
 --*/
 {
     size_t       dwTime;
-    if (ggConfig->m_Function_Set[2])
+    if (cfgShowBtlData)
         gpGlobals->fShowDataInBattle = FALSE;
     //
     // Show the opening menu.
@@ -364,7 +364,7 @@ VOID CPalMain::PAL_GameMain(
         //
         // Set the time of the next frame.
         //
-        dwTime = SDL_GetTicks_New() + ggConfig->m_Function_Set[24];
+        dwTime = SDL_GetTicks_New() + cfgBtlFrameMs;
 
         //
         // Run the main frame routine.        
@@ -415,7 +415,7 @@ VOID CPalMain::PAL_StartFrame(
     //
     ClearScreen();
     PAL_MakeScene();
-    if (ggConfig->m_Function_Set[8])
+    if (cfgIncenseSteps)
     {
         if (gpGlobals->wChaseRange == 0)
         {
@@ -483,9 +483,12 @@ VOID CPalMain::PAL_StartFrame(
         // Auto save the game
         //
         //自动存盘
-        std::cout << "Ctrl+S detected: Auto-saving the game.\n";
-        gpGlobals->PAL_SaveGame(1, 1, p_DataCopy != nullptr);
-        SOUND_Play(28);
+        if (cfgAutoSave)
+        {
+            std::cout << "Ctrl+S detected: Auto-saving the game.\n";
+            gpGlobals->PAL_SaveGame(1, 1, p_DataCopy != nullptr);
+            SOUND_Play(28);
+        }
     }
     if (--gpGlobals->wChasespeedChangeCycles == 0)
     {
@@ -511,10 +514,6 @@ VOID CPalMain::PAL_GameUpdate(
 
   --*/
 {
-    WORD            wEventObjectID, wDir;
-    int             i;
-    LPEVENTOBJECT   p;
-
     //
     // Check for trigger events
     //
@@ -530,7 +529,7 @@ VOID CPalMain::PAL_GameUpdate(
             //
             gpGlobals->fEnteringScene = FALSE;
 
-            i = gpGlobals->wNumScene - 1;
+            int i = gpGlobals->wNumScene - 1;
             gpGlobals->g.rgScene[i].wScriptOnEnter =
                 PAL_RunTriggerScript(gpGlobals->g.rgScene[i].wScriptOnEnter, 0xFFFF);
 
@@ -543,79 +542,79 @@ VOID CPalMain::PAL_GameUpdate(
             }
 
             PAL_ClearKeyAll();
-            PAL_MakeScene();
+            //PAL_MakeScene();
         }
 
         //
         // Update the vanish time for all event objects
         //
-        for (wEventObjectID = 0; wEventObjectID < gpGlobals->g.nEventObject; wEventObjectID++)
+        for (int  wEventObjectID = 0; wEventObjectID < gpGlobals->g.nEventObject; wEventObjectID++)
         {
-            p = &gpGlobals->g.lprgEventObject[wEventObjectID];
+            auto &evobject = gpGlobals->g.lprgEventObject[wEventObjectID];
 
-            if (p->sVanishTime != 0)
+            if (evobject.sVanishTime != 0)
             {
-                p->sVanishTime += ((p->sVanishTime < 0) ? 1 : -1);
+                evobject.sVanishTime += ((evobject.sVanishTime < 0) ? 1 : -1);
             }
         }
 
         //
         // Loop through all event objects in the current scene
         //
-        for (wEventObjectID = gpGlobals->g.rgScene[gpGlobals->wNumScene - 1].wEventObjectIndex + 1;
+        for (int wEventObjectID = gpGlobals->g.rgScene[gpGlobals->wNumScene - 1].wEventObjectIndex + 1;
             wEventObjectID <= gpGlobals->g.rgScene[gpGlobals->wNumScene].wEventObjectIndex;
             wEventObjectID++)
         {
-            p = &gpGlobals->g.lprgEventObject[wEventObjectID - 1];
+            auto &evobject = gpGlobals->g.lprgEventObject[wEventObjectID - 1];
 
-            if (p->sVanishTime != 0)
+            if (evobject.sVanishTime != 0)
             {
                 continue;
             }
 
-            if (p->sState < 0)
+            if (evobject.sState < 0)
             {
-                if (p->x < PAL_X(gpGlobals->viewport) ||
-                    p->x > PAL_X(gpGlobals->viewport) + 320 ||
-                    p->y < PAL_Y(gpGlobals->viewport) ||
-                    p->y > PAL_Y(gpGlobals->viewport) + 320)
+                if (evobject.x < PAL_X(gpGlobals->viewport) ||
+                    evobject.x > PAL_X(gpGlobals->viewport) + 320 ||
+                    evobject.y < PAL_Y(gpGlobals->viewport) ||
+                    evobject.y > PAL_Y(gpGlobals->viewport) + 320)
                 {
-                    p->sState = abs(p->sState);
-                    p->wCurrentFrameNum = 0;
+                    evobject.sState = abs(evobject.sState);
+                    evobject.wCurrentFrameNum = 0;
                 }
             }
-            else if (p->sState > 0 && p->wTriggerMode >= kTriggerTouchNear)
+            else if (evobject.sState > 0 && evobject.wTriggerMode >= kTriggerTouchNear)
             {
                 //
                 // This event object can be triggered without manually exploring
                 //
-                if (abs(PAL_X(gpGlobals->viewport) + PAL_X(gpGlobals->partyoffset) - p->x) +
-                    abs(PAL_Y(gpGlobals->viewport) + PAL_Y(gpGlobals->partyoffset) - p->y) * 2 <
-                    (p->wTriggerMode - kTriggerTouchNear) * 32 + 16)
+                if (abs(PAL_X(gpGlobals->viewport) + PAL_X(gpGlobals->partyoffset) - evobject.x) +
+                    abs(PAL_Y(gpGlobals->viewport) + PAL_Y(gpGlobals->partyoffset) - evobject.y) * 2 <
+                    (evobject.wTriggerMode - kTriggerTouchNear) * 32 + 16)
                 {
                     //
                     // Player is in the trigger zone.
                     //
                     //assert(p->wTriggerScript);
-                    if (p->nSpriteFrames)
+                    if (evobject.nSpriteFrames)
                     {
                         //
                         // The sprite has multiple frames. Try to adjust the direction.
                         //
                         int                xOffset, yOffset;
 
-                        p->wCurrentFrameNum = 0;
+                        evobject.wCurrentFrameNum = 0;
 
-                        xOffset = PAL_X(gpGlobals->viewport) + PAL_X(gpGlobals->partyoffset) - p->x;
-                        yOffset = PAL_Y(gpGlobals->viewport) + PAL_Y(gpGlobals->partyoffset) - p->y;
+                        xOffset = PAL_X(gpGlobals->viewport) + PAL_X(gpGlobals->partyoffset) - evobject.x;
+                        yOffset = PAL_Y(gpGlobals->viewport) + PAL_Y(gpGlobals->partyoffset) - evobject.y;
 
                         if (xOffset > 0)
                         {
-                            p->wDirection = ((yOffset > 0) ? kDirEast : kDirNorth);
+                            evobject.wDirection = ((yOffset > 0) ? kDirEast : kDirNorth);
                         }
                         else
                         {
-                            p->wDirection = ((yOffset > 0) ? kDirSouth : kDirWest);
+                            evobject.wDirection = ((yOffset > 0) ? kDirSouth : kDirWest);
                         }
 
                         //
@@ -630,7 +629,7 @@ VOID CPalMain::PAL_GameUpdate(
                     //
                     // Execute the script.
                     //
-                    p->wTriggerScript = PAL_RunTriggerScript(p->wTriggerScript, wEventObjectID);
+                    evobject.wTriggerScript = PAL_RunTriggerScript(evobject.wTriggerScript, wEventObjectID);
 
                     PAL_ClearKeyAll();
 
@@ -649,11 +648,11 @@ VOID CPalMain::PAL_GameUpdate(
     //
     // Run autoscript for each event objects
     //
-    for (wEventObjectID = gpGlobals->g.rgScene[gpGlobals->wNumScene - 1].wEventObjectIndex + 1;
+    for (int wEventObjectID = gpGlobals->g.rgScene[gpGlobals->wNumScene - 1].wEventObjectIndex + 1;
         wEventObjectID <= gpGlobals->g.rgScene[gpGlobals->wNumScene].wEventObjectIndex;
         wEventObjectID++)
     {
-        p = &gpGlobals->g.lprgEventObject[wEventObjectID - 1];
+        auto const p = &gpGlobals->g.lprgEventObject[wEventObjectID - 1];
 
         if (p->sState > 0 && p->sVanishTime == 0)
         {
@@ -681,8 +680,8 @@ VOID CPalMain::PAL_GameUpdate(
             //
             // Player is in the way, try to move a step
             //
-            wDir = (p->wDirection + 1) % 4;
-            for (i = 0; i < 4; i++)
+            int wDir = (p->wDirection + 1) % 4;
+            for (int i = 0; i < 4; i++)
             {
                 int              x, y;
                 PAL_POS          pos;
@@ -762,7 +761,7 @@ VOID CPalMain::PAL_PartyWalkTo(
             SDL_Delay(1);
         }
 
-        t = SDL_GetTicks_New() + ggConfig->m_Function_Set[24];
+        t = SDL_GetTicks_New() + cfgBtlFrameMs;
 
         //
         // Store trail

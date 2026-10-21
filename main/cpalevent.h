@@ -13,22 +13,22 @@
 #include "palgpgl.h"  
 #include <vector>
 #include "palsurface.h"
+#include "cpaldata.h"
 
 typedef unsigned char Uint8;  
 
-typedef class GL_Render GL_Render;  
+
 class CPalData;
 
 class CPalEvent  
 {  
 
-    CPalEventHandler _m{};  
 public:  
    CPalEvent();  
    ~CPalEvent();  
 private:  
-   int SDLCALL PAL_EventFilter(SDL_Event* lpEvent);  
-   int PAL_PollEvent(SDL_Event* event);  
+
+    int PAL_PollEvent(SDL_Event* event);  
 
    inline static BOOL                   g_switch_WINDOW_FULLSCREEN_DESKTOP;  
    inline static int                    glSeed;  
@@ -39,7 +39,7 @@ public:
    inline static BOOL           PalQuit;  
    inline static BOOL           fInBattle;  
    inline static std::string    PalDir;  
-   inline static class CConfig* ggConfig;//用作全局变量
+
    inline static BOOL           PalSoundIn; //声音进程存在标志
    inline static bool           isTestRun;//调试开关标志
    inline static bool           isShowScript{true}; //是否显示脚本调试信息
@@ -59,7 +59,7 @@ public:
    const  CPalData*             p_DataCopy{};  //
 
    SDL_Palette* gpPalette{};  
-   class CPalData* gpGlobals{};  
+   std::unique_ptr<CPalData> gpGlobals;  
    bool  isRunEnd{};
 public:  
    void KeydownEvent(const union SDL_Event* lpEvent);  
@@ -95,7 +95,6 @@ public:
 public:  
    static char* va(const char* format, ...);  
    static void printMsg(const char* format, ...);
-   static void* UTIL_calloc(size_t n, size_t size);
 
    VOID PAL_Delay(UINT32 t);  
 
@@ -119,21 +118,9 @@ public:
    }
    //返回指定的点是否在 t 中 0 不在，>0 返回 t中 n+1 的位置
    static int isRectsAtPoint(const std::vector<PAL_Rect>& t, PAL_POS p);
-
-   static PalErr CheckHeapIntegrity()
-#ifdef _WIN32 
+   //返回是否是非经典模式，是 非0  否 0 
+   static int isNoClassic()
    {
-       HANDLE heap = GetProcessHeap();
-       if (!HeapValidate(heap, 0, NULL))
-           return TRUE;
-       if (HeapCompact(heap, 0))
-           return TRUE;
-       return FALSE;
+       return cfgRealtimeBtl;
    }
-#else
-   {
-       return FALSE;
-   }
-#endif
-
 };

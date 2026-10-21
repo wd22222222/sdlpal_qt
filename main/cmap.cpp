@@ -23,8 +23,8 @@
 #include "cpalui.h"
 #include "cpaldata.h"
 
-LPPALMAP CPalBaseIO::PAL_LoadMap(INT iMapNum, 
-	ByteArray& fpMapMKF, ByteArray& fpGopMKF)
+std::unique_ptr <PALMAP>  CPalBaseIO::PAL_LoadMap(INT iMapNum,
+	const ByteArray& fpMapMKF,const ByteArray& fpGopMKF)const
 /*++
   Purpose:
 
@@ -49,7 +49,7 @@ LPPALMAP CPalBaseIO::PAL_LoadMap(INT iMapNum,
 {
 	LPBYTE                     buf;
 	INT                        size, i, j;
-	LPPALMAP                   map;
+	auto   map = std::make_unique<PALMAP>();
 
 	//
 	// Check for invalid map number.
@@ -58,7 +58,7 @@ LPPALMAP CPalBaseIO::PAL_LoadMap(INT iMapNum,
 		iMapNum >= PAL_MKFGetChunkCount(fpGopMKF) ||
 		iMapNum <= 0)
 	{
-		return NULL;
+		return map;
 	}
 
 	//
@@ -78,20 +78,15 @@ LPPALMAP CPalBaseIO::PAL_LoadMap(INT iMapNum,
 	//
 	// Create the map instance.
 	//
-	map = (LPPALMAP)malloc(sizeof(PALMAP));
-	if (map == NULL)
-	{
-		return NULL;
-	}
-
+	
 	//
 	// Read the map data.
 	//
 	if (PAL_MKFReadChunk(buf, size, iMapNum, fpMapMKF) < 0)
 	{
 		free(buf);
-		free(map);
-		return NULL;
+		map.release();
+		return map;
 	}
 
 	//
@@ -99,9 +94,9 @@ LPPALMAP CPalBaseIO::PAL_LoadMap(INT iMapNum,
 	//
 	if (gpGlobals->PAL_DeCompress(buf, (LPBYTE)(map->MapTiles), sizeof(map->MapTiles)) < 0)
 	{
-		free(map);
+		map.release();
 		free(buf);
-		return NULL;
+		return map;
 	}
 
 	//
@@ -127,20 +122,11 @@ LPPALMAP CPalBaseIO::PAL_LoadMap(INT iMapNum,
 	size = PAL_MKFGetChunkSize(iMapNum, fpGopMKF);
 	if (size <= 0)
 	{
-		free(map);
-		return NULL;
+		map.release();
+		return map;
 	}
-	map->pTileSprite = (LPSPRITE)malloc(size);
-	if (map->pTileSprite == NULL)
-	{
-		free(map);
-		return NULL;
-	}
-	if (PAL_MKFReadChunk(map->pTileSprite, size, iMapNum, fpGopMKF) < 0)
-	{
-		free(map);
-		return NULL;
-	}
+	map->pTileSprite = PAL_MKFReadChunk(iMapNum, fpGopMKF);
+	
 
 	//
 	// Done.
@@ -149,7 +135,7 @@ LPPALMAP CPalBaseIO::PAL_LoadMap(INT iMapNum,
 	return map;
 }
 
-VOID CPalBaseIO::PAL_FreeMap(LPPALMAP lpMap)
+VOID CPalBaseIO::PAL_FreeMap(LPPALMAP & lpMap)const
 
 /*++
   Purpose:
@@ -171,18 +157,14 @@ VOID CPalBaseIO::PAL_FreeMap(LPPALMAP lpMap)
 	//
 	// Free the tile bitmaps.
 	//
-	if (lpMap->pTileSprite != NULL)
-	{
-		free(lpMap->pTileSprite);
-		lpMap->pTileSprite = nullptr;
-	}
-	//
+	lpMap->pTileSprite.clear();
+
 	// Delete the instance.
 	//
 	free(lpMap);
 }
 
-LPCBITMAPRLE CPalBaseIO::PAL_MapGetTileBitmap(BYTE x, BYTE y, BYTE h, BYTE ucLayer, LPCPALMAP lpMap)
+LPCBITMAPRLE CPalBaseIO::PAL_MapGetTileBitmap(BYTE x, BYTE y, BYTE h, BYTE ucLayer, LPCPALMAP lpMap)const
 
 /*++
   Purpose:
@@ -240,7 +222,7 @@ LPCBITMAPRLE CPalBaseIO::PAL_MapGetTileBitmap(BYTE x, BYTE y, BYTE h, BYTE ucLay
 	}
 }
 
-BOOL CPalBaseIO::PAL_MapTileIsBlocked(BYTE x, BYTE y, BYTE h, LPCPALMAP lpMap)
+BOOL CPalBaseIO::PAL_MapTileIsBlocked(BYTE x, BYTE y, BYTE h, LPCPALMAP lpMap)const
 
 /*++
   Purpose:
@@ -275,7 +257,7 @@ BOOL CPalBaseIO::PAL_MapTileIsBlocked(BYTE x, BYTE y, BYTE h, LPCPALMAP lpMap)
 	return (lpMap->MapTiles[y][x][h] & 0x2000) >> 13;
 }
 
-BYTE CPalBaseIO::PAL_MapGetTileHeight(BYTE x, BYTE y, BYTE h, BYTE ucLayer, LPCPALMAP lpMap)
+BYTE CPalBaseIO::PAL_MapGetTileHeight(BYTE x, BYTE y, BYTE h, BYTE ucLayer, LPCPALMAP lpMap)const
 
 /*++
   Purpose:
@@ -323,7 +305,7 @@ BYTE CPalBaseIO::PAL_MapGetTileHeight(BYTE x, BYTE y, BYTE h, BYTE ucLayer, LPCP
 	return (BYTE)(d & 0xf);
 }
 
-VOID CPalBaseIO::PAL_MapBlitToSurface(LPCPALMAP lpMap, SDL_Surface* lpSurface, const SDL_Rect* lpSrcRect, BYTE ucLayer)
+VOID CPalBaseIO::PAL_MapBlitToSurface(LPCPALMAP lpMap, SDL_Surface* lpSurface, const SDL_Rect* lpSrcRect, BYTE ucLayer)const
 
 /*++
   Purpose:
@@ -383,7 +365,7 @@ VOID CPalBaseIO::PAL_MapBlitToSurface(LPCPALMAP lpMap, SDL_Surface* lpSurface, c
 	}
 }
 
-VOID CPalBaseIO::PAL_MapBlitToSurface(LPCPALMAP lpMap, PalTexture& lpSurface, const SDL_Rect* lpSrcRect, BYTE ucLayer)
+VOID CPalBaseIO::PAL_MapBlitToSurface(LPCPALMAP lpMap, PalTexture& lpSurface, const SDL_Rect* lpSrcRect, BYTE ucLayer)const
 {
 	auto p = PalSurface(gpPalette,PictureWidth,PictureHeight);
 	PAL_MapBlitToSurface(lpMap, p.get(), lpSrcRect, ucLayer);

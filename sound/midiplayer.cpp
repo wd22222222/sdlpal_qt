@@ -810,7 +810,7 @@ int AudioMidiPlayer::Player(int iNumRIX, bool, float)
     {
         return 0;
     }
-    if (CPalEvent::ggConfig && CPalEvent::ggConfig->fIsWIN95)
+    if (cfgIsWin95)
     {
         std::string s = CPalEvent::PalDir + CPalEvent::va("musics\\%3.3d.mid", iNumRIX);
         g_pMidi = native_midi_loadsong(s.c_str());

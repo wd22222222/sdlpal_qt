@@ -90,6 +90,8 @@ public:
     PAL_Color(const SDL_Color& c) { 
         r = c.r; g = c.g; b = c.b; a = c.a;
     };
+    //删除拷贝复制函数
+    PAL_Color(const PAL_Color& other) = delete;
 
     UINT32 toQColor() const
     {

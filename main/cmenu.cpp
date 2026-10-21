@@ -27,7 +27,7 @@
 #include <string>
 #include "palsurface.h"
 
-#define MAINMENU_BACKGROUND_FBPNUM (CPalEvent::ggConfig->fIsWIN95 ? 2 :60)
+#define MAINMENU_BACKGROUND_FBPNUM (cfgIsWin95 ? 2 :60)
 #define CONFIRMMENU_LABEL_NO               19
 #define CONFIRMMENU_LABEL_YES              20
 
@@ -81,7 +81,6 @@ INT CPalBaseIO::PAL_OpeningMenu(
 			{1, MAINMENU_LABEL_LOADGAME, TRUE, PAL_XY(125, 112),PalSize(64,16)}
 	};
 
-	//auto& gConfig = gpGlobals->gConfig;
 	//
 	// Play the background music
 	//
@@ -127,7 +126,7 @@ INT CPalBaseIO::PAL_OpeningMenu(
     PAL_PlayMUS(0, FALSE, 1);
 	PAL_FadeOut(1);
 
-if(ggConfig->fEnableAviPlay)//has avi
+if(cfgUseAVI)//has avi
 	{
 		CAviPlay m;
 		m.PAL_PlayAVI(va("%s/avi/3.AVI", PalDir.c_str()));
@@ -410,7 +409,6 @@ INT CPalBaseIO::PAL_SaveSlotMenu(
 
   --*/
 {
-	auto maxSaveFile = ggConfig->m_Function_Set[47] + ggConfig->m_Function_Set[53];
 	//定义选择按键函数
 	auto getKey = [this](int& menuItem,int& topLine,int maxLine)->int {
 		PAL_WaitForKey(2);
@@ -473,6 +471,8 @@ INT CPalBaseIO::PAL_SaveSlotMenu(
 	int wFirstItem{};
 	if (wCurrentItem >= 5)
 		wFirstItem = (wCurrentItem / 5) * 5;
+	if (wFirstItem >= SAVEFILES - 5)
+		wFirstItem = SAVEFILES - 5;
 	SDL_Rect  rect = { 195, 3, cpBox->wWidth, cpBox->wHeight };
 	PAL_ClearKeyAll();
 	while (!PalQuit)
@@ -480,9 +480,12 @@ INT CPalBaseIO::PAL_SaveSlotMenu(
 		// Draw the numbers of saved times
 		//
 		std::vector<PAL_Rect> itemRects;
+		if (wFirstItem < 0)
+			wFirstItem = 0;
 		for (size_t i = 0; i < 5; i++)
 		{
 			WORD bColor{};
+
 			if ((i + wFirstItem) == wCurrentItem)
 			{
 				bColor = MENUITEM_COLOR_SELECTED_INACTIVE;
@@ -492,20 +495,17 @@ INT CPalBaseIO::PAL_SaveSlotMenu(
 				bColor = MENUITEM_COLOR_INACTIVE;
 			};
 			std::string wStr;
-			/*
-			if (i + wFirstItem < 10)
-				wStr = PAL_GetWord(i + wFirstItem + 20012);
-			else
-			*/
-			wStr = PAL_GetWord(20022) + va("%d", i + wFirstItem + 1
-				- ggConfig->m_Function_Set[53]);//快速存档从0开始。普通从1 开始
+
+			wStr = PAL_GetWord(20022) + va("%d", i + wFirstItem + 1 - cfgAutoSave);//快速存档从0开始。普通从1 开始
 
 			auto pos = PAL_XY(210, 12 + 35 * i);
+
 			auto msize = PAL_DrawText(wStr, pos, bColor, TRUE, TRUE);
+			
 			itemRects.push_back(PAL_Rect( pos,msize));
 
 			UINT wSavedTimes;
-			if (gpGlobals->rgSaveData.at(i + wFirstItem).empty())
+			if (gpGlobals->rgSaveData.at(i + wFirstItem ).empty())
 				wSavedTimes = 0;
 			else
 				wSavedTimes = *((WORD*)gpGlobals->rgSaveData.at(i + wFirstItem).data());
@@ -533,7 +533,7 @@ INT CPalBaseIO::PAL_SaveSlotMenu(
 			continue;
 		};
 
-		if (getKey(wCurrentItem,wFirstItem,maxSaveFile))
+		if (getKey(wCurrentItem,wFirstItem,SAVEFILES))
 			break;
 		RenderPresent(gpTextureReal);
 		//新的选择，已更新屏幕

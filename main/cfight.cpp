@@ -18,21 +18,18 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
-
 #include "cfight.h"
 #include "cscript.h"
+#include "cpaldata.h"
+
 #define NOMINMAX
 #include <assert.h>
-//#include "cscript.h"
-#include "cpaldata.h"
+#include <algorithm>
 
 #define PAL_RunTriggerScript  pCScript->PAL_RunTriggerScript
 #define PAL_RunAutoScript     pCScript->PAL_RunAutoScript
-#undef max
-#undef min
-#include <algorithm>
 
-static int       s_iFrame;
+static int s_iFrame;//0 or 1
 
 CFight::CFight()
 {
@@ -55,7 +52,7 @@ VOID CFight::PAL_BattleDelay(
   --*/
 {
 	int    i, j;
-	DWORD  dwTime = SDL_GetTicks_New() + ggConfig->m_Function_Set[23];
+	DWORD  dwTime = SDL_GetTicks_New() + cfgBtlFrameMs;
 
 	for (i = 0; i < wDuration; i++)
 	{
@@ -100,7 +97,7 @@ VOID CFight::PAL_BattleDelay(
 		//
 		// Set the time of the next frame.
 		// 设置下一帧的时间
-		dwTime = SDL_GetTicks_New() + ggConfig->m_Function_Set[23];
+		dwTime = SDL_GetTicks_New() + cfgBtlFrameMs;
 
 		PAL_BattleMakeScene();
 		RenderBlendCopy(gpTextureReal, g_Battle.lpSceneBuf);;
@@ -131,9 +128,7 @@ VOID CFight::PAL_BattleDelay(
 }
 
 
-BOOL CFight::PAL_BattleDisplayStatChange(
-	VOID
-)
+BOOL CFight::PAL_BattleDisplayStatChange()
 /*++
   功能：    Display the HP and MP changes of all players and enemies.
   展示角色和敌人的hp和mp改变值
@@ -163,7 +158,7 @@ BOOL CFight::PAL_BattleDisplayStatChange(
 
 			x = PAL_X(g_Battle.rgEnemy[i].pos) - 9;
 			y = PAL_Y(g_Battle.rgEnemy[i].pos) - 115;
-            y = std::max(10,(int) y);
+			y = std::max(10, (int)y);
 
 			if (sDamage > 0)
 			{
@@ -187,7 +182,7 @@ BOOL CFight::PAL_BattleDisplayStatChange(
 
 			x = PAL_X(g_Battle.rgPlayer[i].pos) - 9;
 			y = PAL_Y(g_Battle.rgPlayer[i].pos) - 75;
-            y = std::max(10,(int) y);
+			y = std::max(10, (int)y);
 
 			if (sDamage > 0)
 			{
@@ -206,20 +201,18 @@ BOOL CFight::PAL_BattleDisplayStatChange(
 
 			x = PAL_X(g_Battle.rgPlayer[i].pos) - 9;
 			y = PAL_Y(g_Battle.rgPlayer[i].pos) - 67;
-            y = std::max(10, (int)y);
+			y = std::max(10, (int)y);
 
 			// Only show MP increasing
 			if (sDamage > 0)
 			{
 				PAL_BattleUIShowNum((WORD)(sDamage), PAL_XY(x, y), kNumColorCyan);
 			}
-//#ifdef SHOW_MP_DECREASING
 			else
-				if(ggConfig->m_Function_Set[5])
-			{
-				PAL_BattleUIShowNum((WORD)(-sDamage), PAL_XY(x, y), kNumColorBlue);
-			}
-//#endif
+				if (cfgShowMPDrop)
+				{
+					PAL_BattleUIShowNum((WORD)(-sDamage), PAL_XY(x, y), kNumColorBlue);
+				}
 			f = TRUE;
 		}
 	}
@@ -227,7 +220,7 @@ BOOL CFight::PAL_BattleDisplayStatChange(
 	return f;
 }
 
-VOID CFight::PAL_BattlePostActionCheck(
+void CFight::PAL_BattlePostActionCheck(
 	BOOL fCheckPlayers
 )
 /*++
@@ -236,11 +229,10 @@ VOID CFight::PAL_BattlePostActionCheck(
   返回值：    None.
   --*/
 {
-	int      i, j;
-	BOOL     fFade = FALSE;
-	BOOL     fEnemyRemaining = FALSE;
+	BOOL     fFade{};
+	BOOL     fEnemyRemaining{};
 
-	for (i = 0; i <= g_Battle.wMaxEnemyIndex; i++)
+	for (int i = 0; i <= g_Battle.wMaxEnemyIndex; i++)
 	{
 		if (g_Battle.rgEnemy[i].wObjectID == 0)
 		{
@@ -252,25 +244,22 @@ VOID CFight::PAL_BattlePostActionCheck(
 			// This enemy is KO'ed
 			g_Battle.iExpGained += g_Battle.rgEnemy[i].dwExp;
 
-//#ifdef NEW_ScriptOnBattleEnd
-			if (ggConfig->m_Function_Set[12])
+			if (cfgPostBtlScript)
 				g_ScriptOnBattleEnd.push_back(g_Battle.rgEnemy[i].wScriptOnBattleEnd);
-//#endif
 
-#ifdef EDIT_EXP_CALCULATION
-			for (j = 0; j <= gpGlobals->wMaxPartyMemberIndex; j++)
-			{
-				WORD w = gpGlobals->rgParty[i].wPlayerRole;
-				if (gpGlobals->g.PlayerRoles.rgwHP[w] != 0)
+			if (cfgExpFormula)
+				for (int j = 0; j <= gpGlobals->wMaxPartyMemberIndex; j++)
 				{
-					g_Battle.rgPlayer[j].dwExpGained += g_Battle.rgEnemy[i].dwExp;
+					WORD w = gpGlobals->rgParty[i].wPlayerRole;
+					if (gpGlobals->g.PlayerRoles.rgwHP[w])
+					{
+						g_Battle.rgPlayer[j].dwExpGained += g_Battle.rgEnemy[i].dwExp;
+					}
+					else
+					{
+						g_Battle.rgPlayer[j].dwExpGained += g_Battle.rgEnemy[i].dwExp / 10;
+					}
 				}
-				else
-				{
-					g_Battle.rgPlayer[j].dwExpGained += g_Battle.rgEnemy[i].dwExp / 10;
-				}
-			}
-#endif
 			g_Battle.iCashGained += g_Battle.rgEnemy[i].e.wCash;
 
 			SOUND_Play(g_Battle.rgEnemy[i].e.wDeathSound);
@@ -286,12 +275,12 @@ VOID CFight::PAL_BattlePostActionCheck(
 	if (!fEnemyRemaining)
 	{
 		g_Battle.fEnemyCleared = TRUE;
-		g_Battle.UI.state = kBattleUIWait;
+		g_Battle.UI.state = BATTLEUISTATE::kBattleUIWait;
 	}
 
 	if (fCheckPlayers && !gpGlobals->fAutoBattle)
 	{
-		for (i = 0; i <= gpGlobals->wMaxPartyMemberIndex; i++)
+		for (int i = 0; i <= gpGlobals->wMaxPartyMemberIndex; i++)
 		{
 			WORD w = gpGlobals->rgParty[i].wPlayerRole;
 
@@ -332,7 +321,7 @@ VOID CFight::PAL_BattlePostActionCheck(
 			}
 		}
 
-		for (i = 0; i <= gpGlobals->wMaxPartyMemberIndex; i++)
+		for (int i = 0; i <= gpGlobals->wMaxPartyMemberIndex; i++)
 		{
 			WORD w = gpGlobals->rgParty[i].wPlayerRole;
 
@@ -393,13 +382,12 @@ end:
 	//
 	// Fade out the summoned god
 	//
-	if (g_Battle.lpSummonSprite != NULL)
+	if (g_Battle.lpSummonSprite.size())
 	{
 		PAL_BattleUpdateFighters();
 		PAL_BattleDelay(1, 0, FALSE);
 
-		free(g_Battle.lpSummonSprite);
-		g_Battle.lpSummonSprite = NULL;
+		g_Battle.lpSummonSprite.clear();
 
 		g_Battle.sBackgroundColorShift = 0;
 
@@ -410,389 +398,68 @@ end:
 	}
 }
 
-VOID CFight::PAL_BattleUpdateFighters(
-	VOID
-)
+
+
+void CFight::PAL_BattleStartFrame()
 /*++
-  功能：    Update players' and enemies' gestures and locations in battle.
-  参数：    None.
-  返回值：  None.
-  --*/
-{
-	int        i;
-	WORD       wPlayerRole;
-
-	// Update the gesture for all players
-	for (i = 0; i <= gpGlobals->wMaxPartyMemberIndex; i++)
-	{
-		wPlayerRole = gpGlobals->rgParty[i].wPlayerRole;
-
-		g_Battle.rgPlayer[i].pos = g_Battle.rgPlayer[i].posOriginal;
-		g_Battle.rgPlayer[i].iColorShift = 0;
-
-		if (gpGlobals->g.PlayerRoles.rgwHP[wPlayerRole] == 0)
-		{
-			if (gpGlobals->rgPlayerStatus[wPlayerRole][kStatusPuppet] == 0)
-			{
-				g_Battle.rgPlayer[i].wCurrentFrame = 2; // dead		//死亡
-			}
-			else
-			{
-				g_Battle.rgPlayer[i].wCurrentFrame = 0; // puppet	//傀儡虫作用
-			}
-		}
-		else
-		{
-			if (gpGlobals->rgPlayerStatus[wPlayerRole][kStatusSleep] != 0 ||
-				PAL_IsPlayerDying(wPlayerRole))
-			{
-				g_Battle.rgPlayer[i].wCurrentFrame = 1;
-			}
-			else if (g_Battle.rgPlayer[i].fDefending && !g_Battle.fEnemyCleared)
-			{
-				g_Battle.rgPlayer[i].wCurrentFrame = 3;
-			}
-			else
-			{
-				g_Battle.rgPlayer[i].wCurrentFrame = 0;
-			}
-		}
-	}
-
-	// Update the gesture for all enemies
-	for (i = 0; i <= g_Battle.wMaxEnemyIndex; i++)
-	{
-		if (g_Battle.rgEnemy[i].wObjectID == 0)
-		{
-			continue;
-		}
-
-		g_Battle.rgEnemy[i].pos = g_Battle.rgEnemy[i].posOriginal;
-		g_Battle.rgEnemy[i].iColorShift = 0;
-
-		if (g_Battle.rgEnemy[i].rgwStatus[kStatusSleep] > 0 ||
-			g_Battle.rgEnemy[i].rgwStatus[kStatusParalyzed] > 0)
-		{
-			g_Battle.rgEnemy[i].wCurrentFrame = 0;
-			continue;
-		}
-
-		if (--g_Battle.rgEnemy[i].e.wIdleAnimSpeed == 0)
-		{
-			g_Battle.rgEnemy[i].wCurrentFrame++;
-			g_Battle.rgEnemy[i].e.wIdleAnimSpeed =
-				gpGlobals->g.lprgEnemy[gpGlobals->g.rgObject[g_Battle.rgEnemy[i].wObjectID].enemy.wEnemyID].wIdleAnimSpeed;
-		}
-
-		if (g_Battle.rgEnemy[i].wCurrentFrame >= g_Battle.rgEnemy[i].e.wIdleFrames)
-		{
-			g_Battle.rgEnemy[i].wCurrentFrame = 0;
-		}
-	}
-}
- 
-
-VOID CFight::PAL_BattleStartFrame(VOID)
-/*++
-  功能：    Called once per video frame in battle.
+  功能：    Called once per video frame in battle.战斗画面一帧，调用一次
   参数：    None.
   返回值：    None.
   --*/
 {
-	int                      i, j;
-	WORD                     wPlayerRole;
-	DWORD		             wDexterity;
-	BOOL                     fOnlyPuppet = TRUE;
-	WORD					 wMoveTimes;
-	BOOL					 fDexterityIncrease;
-#ifndef PAL_CLASSIC
-	FLOAT                    flMax;
-	BOOL                     fMoved = FALSE;
-	SHORT                    sMax, sMaxIndex;
-#endif
-	//auto gConfig = gpGlobals->gConfig;
-
-	if (!g_Battle.fEnemyCleared)
-	{
-		PAL_BattleUpdateFighters();
-	}
-
-	// Update the scene
-	PAL_BattleMakeScene();
-	RenderBlendCopy(gpTextureReal, g_Battle.lpSceneBuf);;
-	//
-	// Check if the battle is over
-	//
-	if (g_Battle.fEnemyCleared)
-	{
-		//
-		// All enemies are cleared. Won the battle.
-		//
-		g_Battle.BattleResult = kBattleResultWon;
-		SOUND_Play(-1);
+	//检查战斗准备情况，返回1 战斗结束
+	if (PAL_BattleStartFramePrepare())
 		return;
-	}
-	else
+
+	//classic
+	if (isNoClassic())
 	{
-		BOOL fEnded = TRUE;
-		//检查我方存活情况
-		for (i = 0; i <= gpGlobals->wMaxPartyMemberIndex; i++)
+		//
+	}
+	if (g_Battle.Phase == BATTLEPHASE::kBattlePhaseSelectAction)
+	{
+		// The R and F keys and Fleeing should affect all players
+		if (g_Battle.UI.MenuState == BATTLEMENUSTATE::kBattleMenuMain &&
+			g_Battle.UI.state == BATTLEUISTATE::kBattleUISelectMove)
 		{
-			wPlayerRole = gpGlobals->rgParty[i].wPlayerRole;
-			if (gpGlobals->g.PlayerRoles.rgwHP[wPlayerRole] != 0)
+			if (GetKeyPress() & kKeyRepeat)
 			{
-				fOnlyPuppet = FALSE;
-				fEnded = FALSE;
-				break;
+				g_Battle.fRepeat = TRUE;
 			}
-			else if (gpGlobals->rgPlayerStatus[wPlayerRole][kStatusPuppet] != 0)
+			else if (GetKeyPress() & kKeyForce)
 			{
-				fEnded = FALSE;
+				g_Battle.fForce = TRUE;
 			}
 		}
 
-		if (fEnded)
+		if (g_Battle.fRepeat)
 		{
-			// All players are dead. Lost the battle.
-			g_Battle.BattleResult = kBattleResultLost;
-			return;
+			SetKeyPress(kKeyRepeat);
 		}
-	}
-
-	for (int i = 0; i <= gpGlobals->wMaxPartyMemberIndex; i++)
-	{
-		wPlayerRole = gpGlobals->rgParty[i].wPlayerRole;
-		if (ggConfig->m_Function_Set[21])//使用梦蛇后，各项属性增加
-			if (gpGlobals->rgEquipmentEffect[kBodyPartExtra].rgwSpriteNumInBattle[wPlayerRole] == 5)
-				g_Battle.g_ifUseMenshe[wPlayerRole] = 1;
-	}
-	
-	if (g_Battle.Phase == kBattlePhaseSelectAction)
-	{
-		if (g_Battle.UI.state == kBattleUIWait)
+		else if (g_Battle.fForce)
 		{
-			for (i = 0; i <= gpGlobals->wMaxPartyMemberIndex; i++)
+			SetKeyPress(kKeyForce);
+		}
+		else if (g_Battle.fFlee)
+		{
+			SetKeyPress(kKeyFlee);
+		}
+
+		if (g_Battle.UI.state == BATTLEUISTATE::kBattleUIWait)
+		{
+			auto x = PAL_BattlePlayerCanOperation();
+			if (x < 0)
 			{
-				wPlayerRole = gpGlobals->rgParty[i].wPlayerRole;
-
+				//No players are available to control the game.
+				PAL_BattlePlayerSelected();
 				//
-				// Don't select action for this player if player is KO'ed,
-				// sleeped, confused or paralyzed
-				//
-				if (gpGlobals->g.PlayerRoles.rgwHP[wPlayerRole] == 0 || !PAL_New_IfPlayerCanMove(wPlayerRole))
-				{
-					continue;
-				}
-
-				//
-				// Start the menu for the first player whose action is not
-				// yet selected
-				//
-				if (g_Battle.rgPlayer[i].state == kFighterWait)
-				{
-					g_Battle.wMovingPlayerIndex = i;
-					g_Battle.rgPlayer[i].state = kFighterCom;
-					PAL_BattleUIPlayerReady(i);
-					break;
-				}
-				else if (g_Battle.rgPlayer[i].action.ActionType == kBattleActionCoopMagic)
-				{
-					//
-					// Skip other players if someone selected coopmagic
-					//
-					i = gpGlobals->wMaxPartyMemberIndex + 1;
-					break;
-				}
+				PAL_BattleAddTimeMeter();
 			}
-
-			if (i > gpGlobals->wMaxPartyMemberIndex)
+			else if(g_Battle.rgPlayer[x].state == FIGHTERSTATE::kFighterWait)
 			{
-				//
-				// actions for all players are decided. fill in the action queue.
-				//
-				g_Battle.fRepeat = FALSE;
-				g_Battle.fForce = FALSE;
-				g_Battle.fFlee = FALSE;
-
-				g_Battle.iCurAction = 0;
-				//g_Battle.ActionQueue len =20
-                for (i = 0; i < std::min(MAX_ACTIONQUEUE_ITEMS, 20); i++)
-				{
-					g_Battle.ActionQueue[i].wIndex = 0xFFFF;
-					g_Battle.ActionQueue[i].wDexterity = 0;
-					g_Battle.ActionQueue[i].fIsEmpty = TRUE;
-				}
-
-				//
-				// Put all enemies into action queue
-				//
-				for (i = 0, j = 0; i <= g_Battle.wMaxEnemyIndex; i++)
-				{
-					if (g_Battle.rgEnemy[i].wObjectID == 0)
-					{
-						continue;
-					}
-
-					wMoveTimes = g_Battle.rgEnemy[i].e.wDualMove + 2;
-					int iHealthyPlayerNum = PAL_New_GetHealthyPlayerNum();
-
-					if (gpGlobals->wMaxPartyMemberIndex > 2)
-					{
-						wMoveTimes += std::min(2, std::max((iHealthyPlayerNum - 1) / 2, 0));
-					}
-
-#ifdef FINISH_GAME_MORE_ONE_TIME
-					if (gpGlobals->bFinishGameTime > 0)
-					{
-						wMoveTimes += std::min(2, std::max(iHealthyPlayerNum - 1, 0));
-						wMoveTimes += std::min(1, std::max(gpGlobals->bFinishGameTime - 1, 0));
-					}
-#endif 										
-					if (wMoveTimes % 2 == 1 && (PAL_New_GetAliveEnemyNum() < 2) || RandomLong(0, 9) < 5)
-					{
-						wMoveTimes++;
-					}
-					wMoveTimes /= 2;
-
-					WORD wExtraMoveTimes = 0;
-
-#ifdef FINISH_GAME_MORE_ONE_TIME
-					wExtraMoveTimes = std::min(1, std::max(gpGlobals->bFinishGameTime - 1, 0));
-#endif 						
-					//gConfig->m_Function_Set[17]最大行动次数
-					wMoveTimes = std::min((int)wMoveTimes, ggConfig->m_Function_Set[17] + wExtraMoveTimes);
-
-					fDexterityIncrease = FALSE;
-					if ((iHealthyPlayerNum == 3 && (g_Loop & 1)) || iHealthyPlayerNum > 3)
-					{
-						fDexterityIncrease = TRUE;
-					}
-
-					for (; wMoveTimes > 0; wMoveTimes--)
-					{
-						g_Battle.ActionQueue[j].fIsEmpty = FALSE;
-						g_Battle.ActionQueue[j].fIsEnemy = TRUE;
-						g_Battle.ActionQueue[j].wIndex = i;
-						g_Battle.ActionQueue[j].wDexterity = PAL_GetEnemyActualDexterity(i);
-						g_Battle.ActionQueue[j].wDexterity *= RandomFloat(0.9, 1.1);
-
-						if (!(g_Loop) || PAL_New_GetAliveEnemyNum() == 5)
-							//降低速度5个敌人时
-							g_Battle.ActionQueue[j].wDexterity *= 0.8;
-						
-						if (fDexterityIncrease == TRUE)
-						{
-							g_Battle.ActionQueue[j].wDexterity *= RandomFloat(2, iHealthyPlayerNum);
-						}
-						j++;
-					}
-				}
-
-				//
-				// Put all players into action queue
-				//
-				for (i = 0; i <= gpGlobals->wMaxPartyMemberIndex; i++)
-				{
-					wPlayerRole = gpGlobals->rgParty[i].wPlayerRole;
-
-					g_Battle.ActionQueue[j].fIsEmpty = FALSE;
-					g_Battle.ActionQueue[j].fIsEnemy = FALSE;
-					g_Battle.ActionQueue[j].wIndex = i;
-
-					if (gpGlobals->g.PlayerRoles.rgwHP[wPlayerRole] == 0 ||
-						gpGlobals->rgPlayerStatus[wPlayerRole][kStatusSleep] > 0 ||
-						gpGlobals->rgPlayerStatus[wPlayerRole][kStatusParalyzed] > 0)
-					{
-						//
-						// players who are unable to move should attack physically if recovered
-						// in the same turn
-						//
-						g_Battle.ActionQueue[j].wDexterity = 0;
-						g_Battle.rgPlayer[i].action.ActionType = kBattleActionAttack;
-						g_Battle.rgPlayer[i].state = kFighterAct;
-					}
-					else
-					{
-						wDexterity = PAL_GetPlayerActualDexterity(wPlayerRole);
-
-						if (gpGlobals->rgPlayerStatus[wPlayerRole][kStatusConfused] > 0)
-						{
-							g_Battle.rgPlayer[i].action.ActionType = kBattleActionAttack;
-							g_Battle.rgPlayer[i].state = kFighterAct;
-						}
-
-						switch (g_Battle.rgPlayer[i].action.ActionType)
-						{
-						case kBattleActionThrowItem://新增，对投掷物品加速
-							wDexterity *= 1.5;
-							break;
-
-						case kBattleActionCoopMagic:
-							wDexterity *= 100;
-							break;
-
-						case kBattleActionDefend:
-							wDexterity *= 24;
-							break;
-
-						case kBattleActionMagic:
-							if ((gpGlobals->g.rgObject[g_Battle.rgPlayer[i].action.wActionID].magic.wFlags & kMagicFlagUsableToEnemy) == 0)
-							{
-								wDexterity *= 8;
-							}
-							break;
-
-						case kBattleActionFlee:
-							wDexterity /= 2;
-							break;
-
-						case kBattleActionUseItem:
-							wDexterity *= 10;
-							break;
-
-if(ggConfig->m_Function_Set[1])//#ifdef EDIT_DAMAGE_CALC
-						case kBattleActionAttack:
-							wDexterity *= 1.5;
-							break;
-//#endif
-						default:
-							break;
-						}
-
-						if (PAL_IsPlayerDying(wPlayerRole))
-						{
-							wDexterity *= 0.7;
-						}
-
-						wDexterity *= RandomFloat(0.9, 1.1);
-
-						g_Battle.ActionQueue[j].wDexterity = wDexterity;
-					}
-
-					j++;
-				}
-
-				//
-				// Sort the action queue by dexterity value
-				// 活动顺序时间排序
-				//
-				for (i = 0; i < MAX_ACTIONQUEUE_ITEMS; i++)
-				{
-					for (j = i; j < MAX_ACTIONQUEUE_ITEMS; j++)
-					{
-						if (g_Battle.ActionQueue[i].wDexterity < g_Battle.ActionQueue[j].wDexterity)
-						{
-							ACTIONQUEUE t = g_Battle.ActionQueue[i];
-							g_Battle.ActionQueue[i] = g_Battle.ActionQueue[j];
-							g_Battle.ActionQueue[j] = t;
-						}
-					}
-				}
-
-				//
-				// Perform the actions
-				//
-				g_Battle.Phase = kBattlePhasePerformAction;
+				g_Battle.wMovingPlayerIndex = x;
+				g_Battle.rgPlayer[x].state = FIGHTERSTATE::kFighterCom;
+				PAL_BattleUIPlayerReady(x);
 			}
 		}
 	}
@@ -801,244 +468,121 @@ if(ggConfig->m_Function_Set[1])//#ifdef EDIT_DAMAGE_CALC
 		//
 		// Are all actions finished?
 		//
-		DWORD dwPrevMP = 0;
-		DWORD dwPrevHP = 0;
-		INT iExtraPoisonDamage = 0;
-		INT iExtraPoisonMPDamage = 0;
-
-		if (g_Battle.iCurAction >= MAX_ACTIONQUEUE_ITEMS ||
-			g_Battle.ActionQueue[g_Battle.iCurAction].fIsEmpty == TRUE)
+		int i = PAL_BattleGetNextDoing();
+		if(i < 0)
 		{
-			for (i = 0; i <= gpGlobals->wMaxPartyMemberIndex; i++)
-			{
-				g_Battle.rgPlayer[i].fDefending = FALSE;
-			}
+			//本轮没有战斗动作或已经全部结束
 
 			PAL_BattleBackupStat();
 
-			for (i = 0; i <= gpGlobals->wMaxPartyMemberIndex; i++)
+			for (int i = 0; i <= gpGlobals->wMaxPartyMemberIndex; i++)
 			{
-				wPlayerRole = gpGlobals->rgParty[i].wPlayerRole;
-
-				// Update statuses
-				for (j = 0; j < kStatusAll; j++)
+				//如动作结束，执行
+				if (g_Battle.rgPlayer[i].state == FIGHTERSTATE::kFighterEnd)
 				{
-					if (gpGlobals->rgPlayerStatus[wPlayerRole][j] > 0)
-					{
-						gpGlobals->rgPlayerStatus[wPlayerRole][j]--;
-					}
-				}
-				if (ggConfig->m_Function_Set[9])
-					//每一轮减少
-					if (g_Battle.rgPlayer[i].fDefenAction)
-						g_Battle.rgPlayer[i].fDefenAction--;
-
-				//
-				// Run poison scripts
-				// 执行中毒脚本前、后都需要排序 我方
-				PAL_New_SortPoisonsForPlayerByLevel(wPlayerRole);
-				for (j = 0; j < MAX_POISONS; j++)
-				{
-					if (gpGlobals->rgPoisonStatus[j][i].wPoisonID != 0
-						&& gpGlobals->g.PlayerRoles.rgwHP[wPlayerRole] != 0
-						)
-					{
-						if (ggConfig->m_Function_Set[0]) //增加毒的烈度
-						{
-							dwPrevHP = gpGlobals->g.PlayerRoles.rgwHP[wPlayerRole];
-							dwPrevMP = gpGlobals->g.PlayerRoles.rgwMP[wPlayerRole];
-
-							gpGlobals->rgPoisonStatus[j][i].wPoisonScript =
-								PAL_RunTriggerScript(gpGlobals->rgPoisonStatus[j][i].wPoisonScript, wPlayerRole);
-
-							iExtraPoisonDamage = dwPrevHP - gpGlobals->g.PlayerRoles.rgwHP[wPlayerRole];
-							iExtraPoisonMPDamage = dwPrevMP - gpGlobals->g.PlayerRoles.rgwMP[wPlayerRole];
-
-							iExtraPoisonDamage = std::max(iExtraPoisonDamage, 0);
-							iExtraPoisonMPDamage = std::max(iExtraPoisonMPDamage, 0);
-							iExtraPoisonDamage *= gpGlobals->rgPoisonStatus[j][i].wPoisonIntensity;
-							iExtraPoisonMPDamage *= gpGlobals->rgPoisonStatus[j][i].wPoisonIntensity;
-							iExtraPoisonDamage = std::min(iExtraPoisonDamage, MAX_DAMAGE);
-							iExtraPoisonMPDamage = std::min(iExtraPoisonMPDamage, MAX_DAMAGE);
-							PAL_IncreaseHPMP(wPlayerRole, -(SHORT)iExtraPoisonDamage, -(SHORT)iExtraPoisonMPDamage);
-						}
-						else
-							gpGlobals->rgPoisonStatus[j][i].wPoisonScript =
-							PAL_RunTriggerScript(gpGlobals->rgPoisonStatus[j][i].wPoisonScript, wPlayerRole);
-					}
-				}
-				PAL_New_SortPoisonsForPlayerByLevel(wPlayerRole);
-
-				//如果死亡了并且不是傀儡虫控制状态，则移除所有的状态
-				if (gpGlobals->g.PlayerRoles.rgwHP[wPlayerRole] == 0
-					&& gpGlobals->rgPlayerStatus[wPlayerRole][kStatusPuppet] == 0)
-				{
-					PAL_New_RemovePlayerAllStatus(wPlayerRole);
+					PAL_BattleProcessPlayerAction(i);
+					g_Battle.rgPlayer[i].state = FIGHTERSTATE::kFighterWait;
 				}
 			}
 
-			for (i = 0; i <= g_Battle.wMaxEnemyIndex; i++)
+			for (int i = 0; i <= g_Battle.wMaxEnemyIndex; i++)
 			{
-				// Update statuses
-				for (j = 0; j < kStatusAll; j++)
+				//如果动作结束，执行
+				if (g_Battle.rgEnemy[i].state == FIGHTERSTATE::kFighterEnd)
 				{
-					if (g_Battle.rgEnemy[i].rgwStatus[j] > 0)
-					{
-						g_Battle.rgEnemy[i].rgwStatus[j]--;
-					}
+					PAL_BattleProcessEnemyAction(i);
+					g_Battle.rgEnemy[i].state == FIGHTERSTATE::kFighterWait;
 				}
-				//
-				// Run poison scripts
-				// 执行中毒脚本前、后都需要排序  敌方
-				PAL_New_SortPoisonsForEnemyByLevel(i);
-				for (j = 0; j < MAX_POISONS; j++)
-				{
-					WORD wPoisonID = g_Battle.rgEnemy[i].rgPoisons[j].wPoisonID;
-					if (wPoisonID != 0)
-					{
-						//#ifdef POISON_STATUS_EXPAND
-						if (ggConfig->m_Function_Set[0])
-						{
-							dwPrevHP = g_Battle.rgEnemy[i].dwActualHealth;
-							g_Battle.rgEnemy[i].rgPoisons[j].wPoisonScript =
-								PAL_RunTriggerScript(g_Battle.rgEnemy[i].rgPoisons[j].wPoisonScript, (WORD)i);
-							iExtraPoisonDamage = dwPrevHP - g_Battle.rgEnemy[i].dwActualHealth;
-							WORD wPoisonIntensity = g_Battle.rgEnemy[i].rgPoisons[j].wPoisonIntensity;
-							if (iExtraPoisonDamage > 0 && wPoisonIntensity > 0)
-							{
-								iExtraPoisonDamage *= wPoisonIntensity;
-								iExtraPoisonDamage = std::min(iExtraPoisonDamage,(int) g_Battle.rgEnemy[i].dwActualHealth);
-								g_Battle.rgEnemy[i].dwActualHealth -= iExtraPoisonDamage;
-							}
-						}
-						else
-							//#else
-							g_Battle.rgEnemy[i].rgPoisons[j].wPoisonScript =
-							PAL_RunTriggerScript(g_Battle.rgEnemy[i].rgPoisons[j].wPoisonScript, (WORD)i);
-						//#endif
-					}
-				}
-				PAL_New_SortPoisonsForEnemyByLevel(i);
 			}
-
+			//战斗回合结束时执行
 			PAL_BattlePostActionCheck(FALSE);
 			if (PAL_BattleDisplayStatChange())
 			{
 				PAL_BattleDelay(8, 0, TRUE);
 			}
 
-			if (g_Battle.iHidingTime > 0)
+			//if (g_Battle.iHidingTime > 0)
+			if (PAL_GetHidingTime() > 0)
 			{
-				if (--g_Battle.iHidingTime == 0)
+				int x = PAL_GetHidingTime();
+				PAL_SetHidingTime(--x);
+				if (x == 0)
 				{
 					PAL_BattleBackupScene();
 					PAL_BattleMakeScene();
-					RenderBlendCopy(gpTextureReal, g_Battle.lpSceneBuf);;
+					RenderBlendCopy(gpTextureReal, g_Battle.lpSceneBuf);
 					PAL_BattleFadeScene();
 				}
 			}
 
-			if (g_Battle.iHidingTime == 0)
+			//if (g_Battle.iHidingTime == 0)
+			if (PAL_GetHidingTime() == 0)
 			{
-				for (i = 0; i <= g_Battle.wMaxEnemyIndex; i++)
+				for (int i = 0; i <= g_Battle.wMaxEnemyIndex; i++)
 				{
 					if (g_Battle.rgEnemy[i].wObjectID == 0)
 					{
 						continue;
 					}
-
+					//Each round is executed only once.
 					g_Battle.rgEnemy[i].wScriptOnTurnStart =
 						PAL_RunTriggerScript(g_Battle.rgEnemy[i].wScriptOnTurnStart, i);
 				}
 			}
 
 			// Clear all item-using records
-			for (i = 0; i < MAX_INVENTORY; i++)
+			for (int i = 0; i < MAX_INVENTORY; i++)
 			{
 				gpGlobals->rgInventory[i].nAmountInUse = 0;
 			}
 
 			// Proceed to next turn...
-			g_Battle.Phase = kBattlePhaseSelectAction;
+			g_Battle.Phase = BATTLEPHASE::kBattlePhaseSelectAction;
 			g_Loop++;//战斗进入下一轮
 		}
 		else
 		{
-			i = g_Battle.ActionQueue[g_Battle.iCurAction].wIndex;
-
-			if (g_Battle.ActionQueue[g_Battle.iCurAction].fIsEnemy)
+			//以下进行战斗动作
 			{
-				if (g_Battle.iHidingTime == 0 && !fOnlyPuppet &&
-					g_Battle.rgEnemy[i].wObjectID != 0)
-				{
-					g_Battle.rgEnemy[i].wScriptOnReady =
-						PAL_RunTriggerScript(g_Battle.rgEnemy[i].wScriptOnReady, i);
 
-					g_Battle.fEnemyMoving = TRUE;
-					g_Battle.wMovingEnemyIndex = i;
-					PAL_BattleEnemyPerformAction(i);
-					g_Battle.fEnemyMoving = FALSE;
-				}
-			}
-			else if (g_Battle.rgPlayer[i].state == kFighterAct)
-			{
-				wPlayerRole = gpGlobals->rgParty[i].wPlayerRole;
-
-				if (gpGlobals->g.PlayerRoles.rgwHP[wPlayerRole] == 0)
+				if (i >= MAX_PLAYERS_IN_PARTY)
 				{
-					if (gpGlobals->rgPlayerStatus[wPlayerRole][kStatusPuppet] == 0)
+					int j = i - MAX_PLAYERS_IN_PARTY;
+					//if (g_Battle.iHidingTime == 0 && !fOnlyPuppet &&
+					if (PAL_GetHidingTime() == 0 && !fOnlyPuppet &&
+						g_Battle.rgEnemy[j].wObjectID != 0)
 					{
-						g_Battle.rgPlayer[i].action.ActionType = kBattleActionPass;
+						//敌方动作
+						PAL_BattleEnemyDoAction(j);
+
+						if (g_Battle.rgEnemy[j].mMoveTimes > ++g_Battle.rgEnemy[j].mCurrentMove)
+						{
+							g_Battle.rgEnemy[j].flTimeMeter *= 0.75;
+						}
+						else
+						{
+							g_Battle.rgEnemy[j].mCurrentMove = g_Battle.rgEnemy[j].mMoveTimes;
+							g_Battle.rgEnemy[j].flTimeMeter = 0;
+							g_Battle.rgEnemy[j].state = FIGHTERSTATE::kFighterEnd;
+						}
+					}
+					else
+					{
+						g_Battle.rgEnemy[j].flTimeMeter = 0.0f;
+						g_Battle.rgEnemy[j].state = FIGHTERSTATE::kFighterEnd;
 					}
 				}
-				else if (gpGlobals->rgPlayerStatus[wPlayerRole][kStatusSleep] > 0 ||
-					gpGlobals->rgPlayerStatus[wPlayerRole][kStatusParalyzed] > 0)
+				else
 				{
-					g_Battle.rgPlayer[i].action.ActionType = kBattleActionPass;
+					if (g_Battle.rgPlayer[i].state == FIGHTERSTATE::kFighterAct)//玩家动作
+					{
+						PAL_BattlePlayerDoAction(i);
+						g_Battle.rgPlayer[i].flTimeMeter = 0.0f;
+						g_Battle.rgPlayer[i].state = FIGHTERSTATE::kFighterEnd;
+					}
 				}
-				else if (gpGlobals->rgPlayerStatus[wPlayerRole][kStatusConfused] > 0)
-				{
-					g_Battle.rgPlayer[i].action.ActionType = kBattleActionAttackMate;
-				}
-
-				//
-				// Perform the action for this player.
-				//
-				g_Battle.fPlayerMoving = TRUE;
-				g_Battle.wMovingPlayerIndex = i;
-				PAL_BattlePlayerPerformAction(i);
-				g_Battle.fPlayerMoving = FALSE;
 			}
-
-			g_Battle.iCurAction++;
 		}
-	}
-
-	// The R and F keys and Fleeing should affect all players
-	if (g_Battle.UI.MenuState == kBattleMenuMain &&
-		g_Battle.UI.state == kBattleUISelectMove)
-	{
-		if (GetKeyPress() & kKeyRepeat)
-		{
-			g_Battle.fRepeat = TRUE;
-		}
-		else if (GetKeyPress() & kKeyForce)
-		{
-			g_Battle.fForce = TRUE;
-		}
-	}
-
-	if (g_Battle.fRepeat)
-	{
-		SetKeyPress(kKeyRepeat);
-	}
-	else if (g_Battle.fForce)
-	{
-		SetKeyPress(kKeyForce);
-	}
-	else if (g_Battle.fFlee)
-	{
-		SetKeyPress(kKeyFlee);
 	}
 
 	// Update the battle UI
@@ -1048,8 +592,9 @@ if(ggConfig->m_Function_Set[1])//#ifdef EDIT_DAMAGE_CALC
 VOID CFight::PAL_BattleCommitAction(BOOL fRepeat)
 /*++
   功能：
-
+  执行玩家决定的动作。
   Commit the action which the player decided.
+  //动作对象为 g_Battle.UI.wCurPlayerIndex
 
   参数：
 
@@ -1062,61 +607,62 @@ VOID CFight::PAL_BattleCommitAction(BOOL fRepeat)
   --*/
 {
 	WORD      w;
-
+	auto const index = g_Battle.UI.wCurPlayerIndex;
 	if (!fRepeat)
 	{
-		g_Battle.rgPlayer[g_Battle.UI.wCurPlayerIndex].action.ActionType =
+		g_Battle.rgPlayer[index].action.ActionType =
 			g_Battle.UI.wActionType;
-		g_Battle.rgPlayer[g_Battle.UI.wCurPlayerIndex].action.sTarget =
+		g_Battle.rgPlayer[index].action.sTarget =
 			(SHORT)g_Battle.UI.wSelectedIndex;
-		g_Battle.rgPlayer[g_Battle.UI.wCurPlayerIndex].action.wActionID =
+		g_Battle.rgPlayer[index].action.wActionID =
 			g_Battle.UI.wObjectID;
 	}
-	else if (g_Battle.rgPlayer[g_Battle.UI.wCurPlayerIndex].action.ActionType == kBattleActionPass)
+	else if (g_Battle.rgPlayer[index].action.ActionType == BATTLEACTIONTYPE::kBattleActionPass)
 	{
-		g_Battle.rgPlayer[g_Battle.UI.wCurPlayerIndex].action.ActionType = kBattleActionAttack;
-		g_Battle.rgPlayer[g_Battle.UI.wCurPlayerIndex].action.sTarget = -1;
+		//缺省动作为物攻，一但有攻击能力时执行
+		g_Battle.rgPlayer[index].action.ActionType = BATTLEACTIONTYPE::kBattleActionAttack;
+		g_Battle.rgPlayer[index].action.sTarget = -1;
 	}
 
 	//
 	// Check if the action is valid
 	//
-	switch (g_Battle.rgPlayer[g_Battle.UI.wCurPlayerIndex].action.ActionType)
+	switch (g_Battle.rgPlayer[index].action.ActionType)
 	{
-	case kBattleActionMagic:
-		w = g_Battle.rgPlayer[g_Battle.UI.wCurPlayerIndex].action.wActionID;
+	case BATTLEACTIONTYPE::kBattleActionMagic:
+		w = g_Battle.rgPlayer[index].action.wActionID;
 		w = gpGlobals->g.lprgMagic[gpGlobals->g.rgObject[w].magic.wMagicNumber].wCostMP;
 
-		if (gpGlobals->g.PlayerRoles.rgwMP[gpGlobals->rgParty[g_Battle.UI.wCurPlayerIndex].wPlayerRole] < w)
+		if (gpGlobals->g.PlayerRoles.rgwMP[gpGlobals->rgParty[index].wPlayerRole] < w)
 		{
-			w = g_Battle.rgPlayer[g_Battle.UI.wCurPlayerIndex].action.wActionID;
+			w = g_Battle.rgPlayer[index].action.wActionID;
 			w = gpGlobals->g.lprgMagic[gpGlobals->g.rgObject[w].magic.wMagicNumber].wType;
 			if (w == kMagicTypeApplyToPlayer || w == kMagicTypeApplyToParty ||
 				w == kMagicTypeTrance)
 			{
-				g_Battle.rgPlayer[g_Battle.UI.wCurPlayerIndex].action.ActionType = kBattleActionDefend;
+				g_Battle.rgPlayer[index].action.ActionType = BATTLEACTIONTYPE::kBattleActionDefend;
 			}
 			else
 			{
-				g_Battle.rgPlayer[g_Battle.UI.wCurPlayerIndex].action.ActionType = kBattleActionAttack;
-				if (g_Battle.rgPlayer[g_Battle.UI.wCurPlayerIndex].action.sTarget == -1)
+				g_Battle.rgPlayer[index].action.ActionType = BATTLEACTIONTYPE::kBattleActionAttack;
+				if (g_Battle.rgPlayer[index].action.sTarget == -1)
 				{
-					g_Battle.rgPlayer[g_Battle.UI.wCurPlayerIndex].action.sTarget = 0;
+					g_Battle.rgPlayer[index].action.sTarget = 0;
 				}
 			}
 		}
 		break;
 
-	case kBattleActionUseItem:
-		if ((gpGlobals->g.rgObject[g_Battle.rgPlayer[g_Battle.UI.wCurPlayerIndex].action.wActionID].item.wFlags & kItemFlagConsuming) == 0)
+	case BATTLEACTIONTYPE::kBattleActionUseItem:
+		if ((gpGlobals->g.rgObject[g_Battle.rgPlayer[index].action.wActionID].item.wFlags & kItemFlagConsuming) == 0)
 		{
 			break;
 		}
 
-	case kBattleActionThrowItem:
+	case BATTLEACTIONTYPE::kBattleActionThrowItem:
 		for (w = 0; w < MAX_INVENTORY; w++)
 		{
-			if (gpGlobals->rgInventory[w].wItem == g_Battle.rgPlayer[g_Battle.UI.wCurPlayerIndex].action.wActionID)
+			if (gpGlobals->rgInventory[w].wItem == g_Battle.rgPlayer[index].action.wActionID)
 			{
 				gpGlobals->rgInventory[w].nAmountInUse++;
 				break;
@@ -1128,13 +674,14 @@ VOID CFight::PAL_BattleCommitAction(BOOL fRepeat)
 		break;
 	}
 
-	if (g_Battle.UI.wActionType == kBattleActionFlee)
+	if (g_Battle.UI.wActionType == BATTLEACTIONTYPE::kBattleActionFlee)
 	{
 		g_Battle.fFlee = TRUE;
 	}
 
-	g_Battle.rgPlayer[g_Battle.UI.wCurPlayerIndex].state = kFighterAct;
-	g_Battle.UI.state = kBattleUIWait;
+	///???
+	g_Battle.rgPlayer[index].state = FIGHTERSTATE::kFighterAct;
+	g_Battle.UI.state = BATTLEUISTATE::kBattleUIWait;
 
 }
 
@@ -1219,7 +766,7 @@ VOID CFight::PAL_BattleShowPlayerAttackAnim(
 	x = enemy_x;
 	y = enemy_y - enemy_h / 3 + 10;
 
-	dwTime = SDL_GetTicks_New() + ggConfig->m_Function_Set[23];
+	dwTime = SDL_GetTicks_New() + cfgBtlFrameMs;
 
 	for (i = 0; i < 3; i++)
 	{
@@ -1238,7 +785,7 @@ VOID CFight::PAL_BattleShowPlayerAttackAnim(
 		//
 		// Set the time of the next frame.
 		//
-		dwTime = SDL_GetTicks_New() + ggConfig->m_Function_Set[23];
+		dwTime = SDL_GetTicks_New() + cfgBtlFrameMs;
 
 		//
 		// Update the gesture of enemies.
@@ -1256,7 +803,8 @@ VOID CFight::PAL_BattleShowPlayerAttackAnim(
 			{
 				g_Battle.rgEnemy[j].wCurrentFrame++;
 				g_Battle.rgEnemy[j].e.wIdleAnimSpeed =
-					gpGlobals->g.lprgEnemy[gpGlobals->g.rgObject[g_Battle.rgEnemy[j].wObjectID].enemy.wEnemyID].wIdleAnimSpeed;
+					gpGlobals->g.lprgEnemy[gpGlobals->g.rgObject[
+						g_Battle.rgEnemy[j].wObjectID].enemy.wEnemyID].wIdleAnimSpeed;
 			}
 
 			if (g_Battle.rgEnemy[j].wCurrentFrame >= g_Battle.rgEnemy[j].e.wIdleFrames)
@@ -1415,6 +963,296 @@ VOID CFight::PAL_BattleShowPlayerUseItemAnim(
 	}
 }
 
+
+void CFight::PAL_BattlePlayerSelected()
+{
+
+	//
+	// actions for all players are decided. fill in the action queue.
+	//
+	int  wMoveTimes{};
+	g_Battle.fRepeat = FALSE;
+	g_Battle.fForce = FALSE;
+	g_Battle.fFlee = FALSE;
+
+
+	//
+	// Put all enemies into action queue
+	//
+	for (int i = 0; i <= g_Battle.wMaxEnemyIndex; i++)
+	{
+		if (g_Battle.rgEnemy[i].wObjectID == 0)
+		{
+			continue;
+		}
+		// Instant combat, if you are in charge or action, skip
+		if (g_Battle.rgEnemy[i].state != FIGHTERSTATE::kFighterWait)
+		{
+			continue;
+		}
+		wMoveTimes = g_Battle.rgEnemy[i].e.wDualMove + 2;
+		int iHealthyPlayerNum = PAL_New_GetHealthyPlayerNum();
+
+		if (gpGlobals->wMaxPartyMemberIndex > 2)
+		{
+			wMoveTimes += std::min(2, std::max((iHealthyPlayerNum - 1) / 2, 0));
+		}
+
+#ifdef FINISH_GAME_MORE_ONE_TIME
+		if (gpGlobals->bFinishGameTime > 0)
+		{
+			wMoveTimes += std::min(2, std::max(iHealthyPlayerNum - 1, 0));
+			wMoveTimes += std::min(1, std::max(gpGlobals->bFinishGameTime - 1, 0));
+		}
+#endif 										
+		if (wMoveTimes % 2 == 1 && (PAL_New_GetAliveEnemyNum() < 2) || RandomLong(0, 9) < 5)
+		{
+			wMoveTimes++;
+		}
+		wMoveTimes /= 2;
+
+		WORD wExtraMoveTimes = 0;
+
+#ifdef FINISH_GAME_MORE_ONE_TIME
+		wExtraMoveTimes = std::min(1, std::max(gpGlobals->bFinishGameTime - 1, 0));
+#endif 						
+		wMoveTimes = std::min((int)wMoveTimes, cfgFoeMaxActions + wExtraMoveTimes);
+
+		int fDexterityIncrease = FALSE;
+		//
+		if ((iHealthyPlayerNum == 3 && (g_Loop & 1)) || iHealthyPlayerNum > 3)
+		{
+			fDexterityIncrease = TRUE;
+		}
+		g_Battle.rgEnemy[i].mMoveTimes = wMoveTimes;
+
+		g_Battle.rgEnemy[i].flTimeChargingSpeed = PAL_GetTimeChargingSpeed(PAL_GetEnemyActualDexterity(i)*RandomFloat(0.9,1.1));
+	}
+
+	//
+	// Put all players into action queue
+	//
+	for (int i = 0; i <= gpGlobals->wMaxPartyMemberIndex; i++)
+	{
+		auto wPlayerRole = gpGlobals->rgParty[i].wPlayerRole;
+
+		if (gpGlobals->g.PlayerRoles.rgwHP[wPlayerRole] == 0 ||
+			gpGlobals->rgPlayerStatus[wPlayerRole][kStatusSleep] > 0 ||
+			gpGlobals->rgPlayerStatus[wPlayerRole][kStatusParalyzed] > 0)
+		{
+			//
+			// players who are unable to move should attack physically if recovered
+			// in the same turn
+			//
+
+			g_Battle.rgPlayer[i].action.ActionType = BATTLEACTIONTYPE::kBattleActionAttack;
+			g_Battle.rgPlayer[i].state = FIGHTERSTATE::kFighterAct;
+			///???
+			auto wDexterity = PAL_GetPlayerActualDexterity(i);
+			wDexterity *= RandomFloat(0.9, 1.1);
+			g_Battle.rgPlayer[i].flTimeChargingSpeed = PAL_GetTimeChargingSpeed(wDexterity);
+		}
+		else
+		{
+			auto wDexterity = PAL_GetPlayerActualDexterity(i);
+			wDexterity *= RandomFloat(0.9, 1.1);
+			g_Battle.rgPlayer[i].flTimeChargingSpeed = PAL_GetTimeChargingSpeed(wDexterity);
+			if (gpGlobals->rgPlayerStatus[wPlayerRole][kStatusConfused] > 0)
+			{
+				g_Battle.rgPlayer[i].action.ActionType = BATTLEACTIONTYPE::kBattleActionAttack;
+				g_Battle.rgPlayer[i].state = FIGHTERSTATE::kFighterAct;
+			}
+		}
+	}
+
+	//
+	// Perform the actions
+	//
+	g_Battle.Phase = BATTLEPHASE::kBattlePhasePerformAction;
+
+}
+
+//检查是否还有玩家可以操作，无返回-1 有返回玩家在队伍中的序号
+//Check if there are still players who can operate it, no return -1
+// has the serial number of the returning player in the team
+const int CFight::PAL_BattlePlayerCanOperation()const
+{
+	for (int i = 0; i <= gpGlobals->wMaxPartyMemberIndex; i++)
+	{
+		auto wPlayerRole = gpGlobals->rgParty[i].wPlayerRole;
+
+		//
+		// Don't select action for this player if player is KO'ed,
+		// sleeped, confused or paralyzed
+		//
+		if (gpGlobals->g.PlayerRoles.rgwHP[wPlayerRole] == 0 || !PAL_New_IfPlayerCanMove(wPlayerRole))
+		{
+			continue;
+		}
+
+		//
+		// Start the menu for the first player whose action is not
+		// yet selected
+		//
+		if (g_Battle.rgPlayer[i].state == FIGHTERSTATE::kFighterWait)
+		{
+			return i;
+		}
+		else if (g_Battle.rgPlayer[i].action.ActionType == BATTLEACTIONTYPE::kBattleActionCoopMagic)
+		{
+			//
+			// Skip other players if someone selected coopmagic
+			//
+			break;
+		}
+	}
+	return -1;
+}
+
+void CFight::PAL_BattlePlayerDoAction(int iPlayer)
+{
+
+	//玩家动作
+	auto i = iPlayer;
+	auto wPlayerRole = gpGlobals->rgParty[i].wPlayerRole;
+	g_Battle.rgPlayer[i].fDefending = FALSE;
+	if (gpGlobals->g.PlayerRoles.rgwHP[wPlayerRole] == 0)
+	{
+		if (gpGlobals->rgPlayerStatus[wPlayerRole][kStatusPuppet] == 0)
+		{
+			g_Battle.rgPlayer[i].action.ActionType = BATTLEACTIONTYPE::kBattleActionPass;
+		}
+	}
+	else if (gpGlobals->rgPlayerStatus[wPlayerRole][kStatusSleep] > 0 ||
+		gpGlobals->rgPlayerStatus[wPlayerRole][kStatusParalyzed] > 0)
+	{
+		g_Battle.rgPlayer[i].action.ActionType = BATTLEACTIONTYPE::kBattleActionPass;
+	}
+	else if (gpGlobals->rgPlayerStatus[wPlayerRole][kStatusConfused] > 0)
+	{
+		g_Battle.rgPlayer[i].action.ActionType = BATTLEACTIONTYPE::kBattleActionAttackMate;
+	}
+
+	//
+	// Perform the action for this player.
+	//
+	g_Battle.fPlayerMoving = TRUE;
+	g_Battle.wMovingPlayerIndex = i;
+	PAL_BattlePlayerPerformAction(i);
+	g_Battle.fPlayerMoving = FALSE;
+
+}
+
+void CFight::PAL_BattleEnemyDoAction(int i)
+{
+	//敌方动作
+	g_Battle.rgEnemy[i].wScriptOnReady =
+		PAL_RunTriggerScript(g_Battle.rgEnemy[i].wScriptOnReady, i);
+
+	g_Battle.fEnemyMoving = TRUE;
+	g_Battle.wMovingEnemyIndex = i;
+	PAL_BattleEnemyPerformAction(i);
+	g_Battle.fEnemyMoving = FALSE;
+}
+
+//每轮战斗循环之前的检测
+//返回0 正常，返回1 战斗结束
+const int CFight::PAL_BattleStartFramePrepare()
+{
+	fOnlyPuppet = TRUE;
+	if (!g_Battle.fEnemyCleared)
+	{
+		PAL_BattleUpdateFighters();
+	}
+
+	// Update the scene
+	PAL_BattleMakeScene();
+	RenderBlendCopy(gpTextureReal, g_Battle.lpSceneBuf);;
+	//
+	// Check if the battle is over
+	//
+	if (g_Battle.fEnemyCleared)
+	{
+		//
+		// All enemies are cleared. Won the battle.
+		//
+		g_Battle.BattleResult = kBattleResultWon;
+		SOUND_Play(-1);
+		return 1;
+	}
+	else
+	{
+		BOOL fEnded = TRUE;
+		//检查我方存活情况
+		for (int i = 0; i <= gpGlobals->wMaxPartyMemberIndex; i++)
+		{
+			auto wPlayerRole = gpGlobals->rgParty[i].wPlayerRole;
+			if (gpGlobals->g.PlayerRoles.rgwHP[wPlayerRole] != 0)
+			{
+				fOnlyPuppet = FALSE;
+				fEnded = FALSE;
+				break;
+			}
+			else if (gpGlobals->rgPlayerStatus[wPlayerRole][kStatusPuppet] != 0)
+			{
+				fEnded = FALSE;
+			}
+		}
+
+		if (fEnded)
+		{
+			// All players are dead. Lost the battle.
+			g_Battle.BattleResult = kBattleResultLost;
+			return 1;
+		}
+	}
+
+	if (cfgDreamSnakeUp)//使用梦蛇后，各项属性增加
+		for (int i = 0; i <= gpGlobals->wMaxPartyMemberIndex; i++)
+		{
+			auto wPlayerRole = gpGlobals->rgParty[i].wPlayerRole;
+			if (gpGlobals->rgEquipmentEffect[kBodyPartExtra].rgwSpriteNumInBattle[wPlayerRole] == 5)
+				g_Battle.g_ifUseMenshe[wPlayerRole] = 1;
+		}
+
+	return 0;
+}
+
+//动作队列成员的一帧，调用一次 ???
+int CFight::PAL_BattleStartFrameOne(int actionAueue_Item)
+{
+	return 0;
+}
+
+VOID CFight::PAL_BattleUIShowNum(WORD wNum, PAL_POS pos, NUMCOLOR color)
+/*++
+Purpose:    Show a number on battle screen (indicates HP/MP change).
+在战斗屏幕上显示数字（表示生命值和魔法值的变化）。
+Parameters:    [IN]  wNum - number to be shown.
+要显示的数字。
+[IN]  pos - position of the number on the screen.
+数字在屏幕上的位置。
+[IN]  color - color of the number.
+数字的颜色。
+Return value:    None.
+--*/
+{
+	int     i;
+
+	for (i = 0; i < BATTLEUI_MAX_SHOWNUM; i++)
+	{
+		if (g_Battle.UI.rgShowNum[i].wNum == 0)
+		{
+			g_Battle.UI.rgShowNum[i].wNum = wNum;
+			g_Battle.UI.rgShowNum[i].pos = PAL_XY(PAL_X(pos) - 15, PAL_Y(pos));
+			g_Battle.UI.rgShowNum[i].color = color;
+			g_Battle.UI.rgShowNum[i].dwTime = SDL_GetTicks_New();
+
+			break;
+		}
+	}
+}
+
 VOID CFight::PAL_BattleShowPlayerPreMagicAnim(
 	WORD         wPlayerIndex,
 	BOOL         fSummon
@@ -1442,7 +1280,7 @@ VOID CFight::PAL_BattleShowPlayerPreMagicAnim(
 	PAL_BattleDelay(2, 0, TRUE);
 
 	g_Battle.rgPlayer[wPlayerIndex].wCurrentFrame = 5;
-	if (!ggConfig->fIsWIN95)
+	if (!cfgIsWin95)
 	{
 		SOUND_Play(gpGlobals->g.PlayerRoles.rgwMagicSound[wPlayerRole]);
 	}
@@ -1457,10 +1295,10 @@ VOID CFight::PAL_BattleShowPlayerPreMagicAnim(
 		index = gpGlobals->g.rgwBattleEffectIndex[PAL_GetPlayerBattleSprite(wPlayerRole)][0];
 		index *= 10;
 		index += 15;
-//#ifdef PAL_WIN95
-		if (ggConfig->fIsWIN95)
+		//#ifdef PAL_WIN95
+		if (cfgIsWin95)
 			SOUND_Play(gpGlobals->g.PlayerRoles.rgwMagicSound[wPlayerRole]);
-//#endif
+		//#endif
 		for (i = 0; i < 10; i++)
 		{
 			LPCBITMAPRLE b = PAL_SpriteGetFrame(g_Battle.lpEffectSprite, index++);
@@ -1478,7 +1316,7 @@ VOID CFight::PAL_BattleShowPlayerPreMagicAnim(
 			//
 			// Set the time of the next frame.
 			//
-			dwTime = SDL_GetTicks_New() + ggConfig->m_Function_Set[23];
+			dwTime = SDL_GetTicks_New() + cfgBtlFrameMs;
 
 			//
 			// Update the gesture of enemies.
@@ -1533,7 +1371,7 @@ VOID CFight::PAL_BattleShowPlayerDefMagicAnim(
   返回值：    None.
   --*/
 {
-	LPSPRITE   lpSpriteEffect;
+	//LPSPRITE   lpSpriteEffect;
 	int        l, iMagicNum, iEffectNum, n, i, j, x, y;
 	DWORD      dwTime = SDL_GetTicks_New();
 
@@ -1546,9 +1384,7 @@ VOID CFight::PAL_BattleShowPlayerDefMagicAnim(
 		return;
 	}
 
-	lpSpriteEffect = (LPSPRITE)malloc(l);
-
-	PAL_MKFDecompressChunk((LPBYTE)lpSpriteEffect, l, iEffectNum, gpGlobals->f.fpFIRE);
+	auto lpSpriteEffect = PAL_MKFDecompressChunk(iEffectNum, gpGlobals->f.fpFIRE);
 
 	n = PAL_SpriteGetNumFrames(lpSpriteEffect);
 
@@ -1560,7 +1396,7 @@ VOID CFight::PAL_BattleShowPlayerDefMagicAnim(
 	{
 		LPCBITMAPRLE b = PAL_SpriteGetFrame(lpSpriteEffect, i);
 
-		if (i == (ggConfig->fIsWIN95 ? 0 : gpGlobals->g.lprgMagic[iMagicNum].wSoundDelay))//
+		if (i == (cfgIsWin95 ? 0 : gpGlobals->g.lprgMagic[iMagicNum].wSoundDelay))//
 		{
 			SOUND_Play(gpGlobals->g.lprgMagic[iMagicNum].wSound);
 		}
@@ -1616,7 +1452,8 @@ VOID CFight::PAL_BattleShowPlayerDefMagicAnim(
 			//
 			// Repaint the previous player
 			//
-			if (sTarget > 0 && g_Battle.iHidingTime == 0)
+			//if (sTarget > 0 && g_Battle.iHidingTime  == 0)
+			if (sTarget > 0 && PAL_GetHidingTime() == 0)
 			{
 				if (gpGlobals->rgPlayerStatus[gpGlobals->rgParty[sTarget - 1].wPlayerRole][kStatusConfused] == 0)
 				{
@@ -1642,7 +1479,7 @@ VOID CFight::PAL_BattleShowPlayerDefMagicAnim(
 		VIDEO_UpdateScreen(gpTextureReal);
 	}
 
-	free(lpSpriteEffect);
+	//free(lpSpriteEffect);
 
 	for (i = 0; i < 6; i++)
 	{
@@ -1693,10 +1530,9 @@ VOID CFight::PAL_BattleShowPlayerOffMagicAnim(
   返回值：    None.
   --*/
 {
-	LPSPRITE   lpSpriteEffect;
+	//LPSPRITE   lpSpriteEffect;
 	int        l, iMagicNum, iEffectNum, n, i, k, x, y, wave, blow;
 	DWORD      dwTime = SDL_GetTicks_New();
-	//auto& gConfig = gpGlobals->gConfig;
 
 #ifdef ROTATE_SOME_MAGIC_ANIM
 	BOOL		bRotateMagicAnim = FALSE;
@@ -1735,9 +1571,9 @@ VOID CFight::PAL_BattleShowPlayerOffMagicAnim(
 		return;
 	}
 
-	lpSpriteEffect = (LPSPRITE)malloc(l);
+	//lpSpriteEffect = (LPSPRITE)malloc(l);
 
-	PAL_MKFDecompressChunk((LPBYTE)lpSpriteEffect, l, iEffectNum, gpGlobals->f.fpFIRE);
+	ByteArray lpSpriteEffect = PAL_MKFDecompressChunk(iEffectNum, gpGlobals->f.fpFIRE);
 
 	n = PAL_SpriteGetNumFrames(lpSpriteEffect);
 
@@ -1751,7 +1587,7 @@ VOID CFight::PAL_BattleShowPlayerOffMagicAnim(
 	wave = gpGlobals->wScreenWave;
 	gpGlobals->wScreenWave += gpGlobals->g.lprgMagic[iMagicNum].wWave;
 
-	if (ggConfig->fIsWIN95 && !fSummon && gpGlobals->g.lprgMagic[iMagicNum].wSound != 0)
+	if (cfgIsWin95 && !fSummon && gpGlobals->g.lprgMagic[iMagicNum].wSound != 0)
 	{
 		//AUDIO_PlaySound(gpGlobals->g.lprgMagic[iMagicNum].wSound);
 		SOUND_Play(gpGlobals->g.lprgMagic[iMagicNum].wSound);
@@ -1795,7 +1631,7 @@ VOID CFight::PAL_BattleShowPlayerOffMagicAnim(
 
 			b = PAL_SpriteGetFrame(lpSpriteEffect, k);
 
-			if (!ggConfig->fIsWIN95 && (i - gpGlobals->g.lprgMagic[iMagicNum].wSoundDelay) % n == 0)
+			if (!cfgIsWin95 && (i - gpGlobals->g.lprgMagic[iMagicNum].wSoundDelay) % n == 0)
 			{
 				SOUND_Play(gpGlobals->g.lprgMagic[iMagicNum].wSound);
 			}
@@ -1836,38 +1672,14 @@ VOID CFight::PAL_BattleShowPlayerOffMagicAnim(
 			x += (SHORT)gpGlobals->g.lprgMagic[iMagicNum].wXOffset;
 			y += (SHORT)gpGlobals->g.lprgMagic[iMagicNum].wYOffset;
 
-#ifdef ROTATE_SOME_MAGIC_ANIM
-			if (bRotateMagicAnim == FALSE)
-			{
-				PAL_RLEBlitToSurface(b, gpScreen, PAL_XY(x - PAL_RLEGetWidth(b) / 2, y - PAL_RLEGetHeight(b)));
-			}
-			else
-			{
-				PAL_NEW_RLEBlitToSurfaceRotately(b, gpScreen, PAL_XY(x - PAL_RLEGetWidth(b) / 2, y - PAL_RLEGetHeight(b)));
-			}
-#else
 			PAL_RLEBlitToSurface(b, gpTextureReal, PAL_XY(x - PAL_RLEGetWidth(b) / 2, y - PAL_RLEGetHeight(b)));
-#endif
 
 			if (i == l - 1 && gpGlobals->wScreenWave < 9 &&
 				gpGlobals->g.lprgMagic[iMagicNum].wKeepEffect == 0xFFFF)
 			{
 
-#ifdef ROTATE_SOME_MAGIC_ANIM
-				if (bRotateMagicAnim == FALSE)
-				{
-					PAL_RLEBlitToSurface(b, g_Battle.lpBackground,
-						PAL_XY(x - PAL_RLEGetWidth(b) / 2, y - PAL_RLEGetHeight(b)));
-				}
-				else
-				{
-					PAL_NEW_RLEBlitToSurfaceRotately(b, g_Battle.lpBackground,
-						PAL_XY(x - PAL_RLEGetWidth(b) / 2, y - PAL_RLEGetHeight(b)));
-				}
-#else
 				PAL_RLEBlitToSurface(b, g_Battle.lpBackground,
 					PAL_XY(x - PAL_RLEGetWidth(b) / 2, y - PAL_RLEGetHeight(b)));
-#endif
 
 			}
 		}
@@ -1885,40 +1697,14 @@ VOID CFight::PAL_BattleShowPlayerOffMagicAnim(
 				x += (SHORT)gpGlobals->g.lprgMagic[iMagicNum].wXOffset;
 				y += (SHORT)gpGlobals->g.lprgMagic[iMagicNum].wYOffset;
 
-#ifdef ROTATE_SOME_MAGIC_ANIM
-				if (bRotateMagicAnim == FALSE)
-				{
-					PAL_RLEBlitToSurface(b, gpScreen,
-						PAL_XY(x - PAL_RLEGetWidth(b) / 2, y - PAL_RLEGetHeight(b)));
-				}
-				else
-				{
-					PAL_NEW_RLEBlitToSurfaceRotately(b, gpScreen,
-						PAL_XY(x - PAL_RLEGetWidth(b) / 2, y - PAL_RLEGetHeight(b)));
-				}
-#else
 				PAL_RLEBlitToSurface(b, gpTextureReal, PAL_XY(x - PAL_RLEGetWidth(b) / 2, y - PAL_RLEGetHeight(b)));
-#endif
+
 				if (i == l - 1 && gpGlobals->wScreenWave < 9 &&
 					gpGlobals->g.lprgMagic[iMagicNum].wKeepEffect == 0xFFFF)
 				{
 
-#ifdef ROTATE_SOME_MAGIC_ANIM
-					if (bRotateMagicAnim == FALSE)
-					{
-						PAL_RLEBlitToSurface(b, g_Battle.lpBackground,
-							PAL_XY(x - PAL_RLEGetWidth(b) / 2, y - PAL_RLEGetHeight(b)));
-					}
-					else
-					{
-						PAL_NEW_RLEBlitToSurfaceRotately(b, g_Battle.lpBackground,
-							PAL_XY(x - PAL_RLEGetWidth(b) / 2, y - PAL_RLEGetHeight(b)));
-					}
-#else
 					PAL_RLEBlitToSurface(b, g_Battle.lpBackground,
 						PAL_XY(x - PAL_RLEGetWidth(b) / 2, y - PAL_RLEGetHeight(b)));
-#endif
-
 				}
 			}
 		}
@@ -1941,39 +1727,14 @@ VOID CFight::PAL_BattleShowPlayerOffMagicAnim(
 			x += (SHORT)gpGlobals->g.lprgMagic[iMagicNum].wXOffset;
 			y += (SHORT)gpGlobals->g.lprgMagic[iMagicNum].wYOffset;
 
-#ifdef ROTATE_SOME_MAGIC_ANIM
-			if (bRotateMagicAnim == FALSE)
-			{
-				PAL_RLEBlitToSurface(b, gpScreen, PAL_XY(x - PAL_RLEGetWidth(b) / 2, y - PAL_RLEGetHeight(b)));
-			}
-			else
-			{
-				PAL_NEW_RLEBlitToSurfaceRotately(b, gpScreen,
-					PAL_XY(x - PAL_RLEGetWidth(b) / 2, y - PAL_RLEGetHeight(b)));
-			}
-#else
 			PAL_RLEBlitToSurface(b, gpTextureReal, PAL_XY(x - PAL_RLEGetWidth(b) / 2, y - PAL_RLEGetHeight(b)));
-#endif
 
 			if (i == l - 1 && gpGlobals->wScreenWave < 9 &&
 				gpGlobals->g.lprgMagic[iMagicNum].wKeepEffect == 0xFFFF)
 			{
 
-#ifdef ROTATE_SOME_MAGIC_ANIM
-				if (bRotateMagicAnim == FALSE)
-				{
-					PAL_RLEBlitToSurface(b, g_Battle.lpBackground,
-						PAL_XY(x - PAL_RLEGetWidth(b) / 2, y - PAL_RLEGetHeight(b)));
-				}
-				else
-				{
-					PAL_NEW_RLEBlitToSurfaceRotately(b, g_Battle.lpBackground,
-						PAL_XY(x - PAL_RLEGetWidth(b) / 2, y - PAL_RLEGetHeight(b)));
-				}
-#else
-				PAL_RLEBlitToSurface(b, g_Battle.lpBackground.get(),
+				PAL_RLEBlitToSurface(b, g_Battle.lpBackground,
 					PAL_XY(x - PAL_RLEGetWidth(b) / 2, y - PAL_RLEGetHeight(b)));
-#endif
 
 			}
 		}
@@ -1990,7 +1751,7 @@ VOID CFight::PAL_BattleShowPlayerOffMagicAnim(
 	gpGlobals->wScreenWave = wave;
 	VIDEO_ShakeScreen(0, 0);
 
-	free(lpSpriteEffect);
+	//free(lpSpriteEffect);
 
 	for (i = 0; i <= g_Battle.wMaxEnemyIndex; i++)
 	{
@@ -2007,7 +1768,7 @@ VOID CFight::PAL_BattleShowEnemyMagicAnim(WORD wObjectID, SHORT sTarget)
   返回值：    None.
   --*/
 {
-	LPSPRITE   lpSpriteEffect;
+	//LPSPRITE   lpSpriteEffect;
 	int        l, iMagicNum, iEffectNum, n, i, k, x, y, wave, blow;
 	DWORD      dwTime = SDL_GetTicks_New();
 
@@ -2020,9 +1781,7 @@ VOID CFight::PAL_BattleShowEnemyMagicAnim(WORD wObjectID, SHORT sTarget)
 		return;
 	}
 
-	lpSpriteEffect = (LPSPRITE)malloc(l);
-
-	PAL_MKFDecompressChunk((LPBYTE)lpSpriteEffect, l, iEffectNum, gpGlobals->f.fpFIRE);
+	ByteArray lpSpriteEffect = PAL_MKFDecompressChunk(iEffectNum, gpGlobals->f.fpFIRE);
 
 	n = PAL_SpriteGetNumFrames(lpSpriteEffect);
 
@@ -2064,7 +1823,7 @@ VOID CFight::PAL_BattleShowEnemyMagicAnim(WORD wObjectID, SHORT sTarget)
 			b = PAL_SpriteGetFrame(lpSpriteEffect, k);
 
 			//if (i == gpGlobals->g.lprgMagic[iMagicNum].wSoundDelay)
-			if (i == (ggConfig->fIsWIN95 ? 0 : gpGlobals->g.lprgMagic[iMagicNum].wSoundDelay))
+			if (i == (cfgIsWin95 ? 0 : gpGlobals->g.lprgMagic[iMagicNum].wSoundDelay))
 			{
 				SOUND_Play(gpGlobals->g.lprgMagic[iMagicNum].wSound);
 			}
@@ -2178,7 +1937,7 @@ VOID CFight::PAL_BattleShowEnemyMagicAnim(WORD wObjectID, SHORT sTarget)
 	gpGlobals->wScreenWave = wave;
 	VIDEO_ShakeScreen(0, 0);
 
-	free(lpSpriteEffect);
+	//free(lpSpriteEffect);
 
 	for (i = 0; i <= gpGlobals->wMaxPartyMemberIndex; i++)
 	{
@@ -2225,20 +1984,18 @@ VOID CFight::PAL_BattleShowPlayerSummonMagicAnim(WORD wPlayerIndex, WORD wObject
 
 	PAL_BattleBackupScene();
 
-//#ifdef PAL_WIN95
-	if (ggConfig->fIsWIN95)
+	//#ifdef PAL_WIN95
+	if (cfgIsWin95)
 		SOUND_Play(gpGlobals->g.lprgMagic[wMagicNum].wSound);
-//#endif
+	//#endif
 
-	//
-	// Load the sprite of the summoned god
-	//
+		//
+		// Load the sprite of the summoned god
+		//
 	j = gpGlobals->g.lprgMagic[wMagicNum].wSummonEffect + 10;
-	i = PAL_MKFGetDecompressedSize(j, gpGlobals->f.fpF);
+	//i = PAL_MKFGetDecompressedSize(j, gpGlobals->f.fpF);
 
-	g_Battle.lpSummonSprite = (LPSPRITE)malloc(i);
-
-	PAL_MKFDecompressChunk(g_Battle.lpSummonSprite, i, j, gpGlobals->f.fpF);
+	g_Battle.lpSummonSprite = PAL_MKFDecompressChunk(j, gpGlobals->f.fpF);
 
 	g_Battle.iSummonFrame = 0;
 	g_Battle.posSummon = PAL_XY(230 + (SHORT)(gpGlobals->g.lprgMagic[wMagicNum].wXOffset),
@@ -2256,7 +2013,7 @@ VOID CFight::PAL_BattleShowPlayerSummonMagicAnim(WORD wPlayerIndex, WORD wObject
 	// Show the animation of the summoned god
 	// TODO: There is still something missing here compared to the original game.
 	//
-	while (g_Battle.iSummonFrame < PAL_SpriteGetNumFrames(g_Battle.lpSummonSprite) - 1)
+	while (g_Battle.iSummonFrame < PAL_SpriteGetNumFrames(g_Battle.lpSummonSprite.data()) - 1)
 	{
 		//
 		// Wait for the time of one frame. Accept input here.
@@ -2354,17 +2111,17 @@ VOID CFight::PAL_BattlePlayerValidateAction(WORD wPlayerIndex)
 
 	switch (g_Battle.rgPlayer[wPlayerIndex].action.ActionType)
 	{
-	case kBattleActionAttack:
+	case BATTLEACTIONTYPE::kBattleActionAttack:
 		fToEnemy = TRUE;
 		break;
 
-	case kBattleActionPass:
+	case BATTLEACTIONTYPE::kBattleActionPass:
 		break;
 
-	case kBattleActionDefend:
+	case BATTLEACTIONTYPE::kBattleActionDefend:
 		break;
 
-	case kBattleActionMagic:
+	case BATTLEACTIONTYPE::kBattleActionMagic:
 	{
 		//
 		// Make sure player actually has the magic to be used
@@ -2409,7 +2166,7 @@ VOID CFight::PAL_BattlePlayerValidateAction(WORD wPlayerIndex)
 		{
 			if (!fValid)
 			{
-				g_Battle.rgPlayer[wPlayerIndex].action.ActionType = kBattleActionAttack;
+				g_Battle.rgPlayer[wPlayerIndex].action.ActionType = BATTLEACTIONTYPE::kBattleActionAttack;
 			}
 			else if (gpGlobals->g.rgObject[wObjectID].magic.wFlags & kMagicFlagApplyToAll)
 			{
@@ -2426,7 +2183,7 @@ VOID CFight::PAL_BattlePlayerValidateAction(WORD wPlayerIndex)
 		{
 			if (!fValid)
 			{
-				g_Battle.rgPlayer[wPlayerIndex].action.ActionType = kBattleActionDefend;
+				g_Battle.rgPlayer[wPlayerIndex].action.ActionType = BATTLEACTIONTYPE::kBattleActionDefend;
 			}
 			else if (gpGlobals->g.rgObject[wObjectID].magic.wFlags & kMagicFlagApplyToAll)
 			{
@@ -2440,7 +2197,7 @@ VOID CFight::PAL_BattlePlayerValidateAction(WORD wPlayerIndex)
 		break;
 	}
 
-	case kBattleActionCoopMagic:
+	case BATTLEACTIONTYPE::kBattleActionCoopMagic:
 	{
 		fToEnemy = TRUE;
 
@@ -2448,23 +2205,14 @@ VOID CFight::PAL_BattlePlayerValidateAction(WORD wPlayerIndex)
 		{
 			w = gpGlobals->rgParty[i].wPlayerRole;
 
-#ifdef PAL_CLASSIC
 			if (PAL_IsPlayerDying(w) || !PAL_New_IfPlayerCanMove(w))
-#else
-			if (PAL_IsPlayerDying(w) ||
-				gpGlobals->rgPlayerStatus[w][kStatusSilence] > 0 ||
-				gpGlobals->rgPlayerStatus[w][kStatusSleep] > 0 ||
-				gpGlobals->rgPlayerStatus[w][kStatusConfused] > 0 ||
-				g_Battle.rgPlayer[i].flTimeMeter < 100 ||
-				(g_Battle.rgPlayer[i].state == kFighterAct && i != wPlayerIndex))
-#endif
 			{
-				g_Battle.rgPlayer[wPlayerIndex].action.ActionType = kBattleActionAttack;
+				g_Battle.rgPlayer[wPlayerIndex].action.ActionType = BATTLEACTIONTYPE::kBattleActionAttack;
 				break;
 			}
 		}
 
-		if (g_Battle.rgPlayer[wPlayerIndex].action.ActionType == kBattleActionCoopMagic)
+		if (g_Battle.rgPlayer[wPlayerIndex].action.ActionType == BATTLEACTIONTYPE::kBattleActionCoopMagic)
 		{
 			if (gpGlobals->g.rgObject[wObjectID].magic.wFlags & kMagicFlagApplyToAll)
 			{
@@ -2478,16 +2226,16 @@ VOID CFight::PAL_BattlePlayerValidateAction(WORD wPlayerIndex)
 		break;
 	}
 
-	case kBattleActionFlee:
+	case BATTLEACTIONTYPE::kBattleActionFlee:
 		break;
 
-	case kBattleActionThrowItem:
+	case BATTLEACTIONTYPE::kBattleActionThrowItem:
 	{
 		fToEnemy = TRUE;
 
 		if (PAL_GetItemAmount(wObjectID) == 0)
 		{
-			g_Battle.rgPlayer[wPlayerIndex].action.ActionType = kBattleActionAttack;
+			g_Battle.rgPlayer[wPlayerIndex].action.ActionType = BATTLEACTIONTYPE::kBattleActionAttack;
 		}
 		else if (gpGlobals->g.rgObject[wObjectID].item.wFlags & kItemFlagApplyToAll)
 		{
@@ -2500,11 +2248,11 @@ VOID CFight::PAL_BattlePlayerValidateAction(WORD wPlayerIndex)
 		break;
 	}
 
-	case kBattleActionUseItem:
+	case BATTLEACTIONTYPE::kBattleActionUseItem:
 	{
 		if (PAL_GetItemAmount(wObjectID) == 0)
 		{
-			g_Battle.rgPlayer[wPlayerIndex].action.ActionType = kBattleActionDefend;
+			g_Battle.rgPlayer[wPlayerIndex].action.ActionType = BATTLEACTIONTYPE::kBattleActionDefend;
 		}
 		else if (gpGlobals->g.rgObject[wObjectID].item.wFlags & kItemFlagApplyToAll)
 		{
@@ -2517,7 +2265,7 @@ VOID CFight::PAL_BattlePlayerValidateAction(WORD wPlayerIndex)
 		break;
 	}
 
-	case kBattleActionAttackMate:
+	case BATTLEACTIONTYPE::kBattleActionAttackMate:
 	{
 		if (gpGlobals->rgPlayerStatus[wPlayerRole][kStatusConfused] == 0)
 		{
@@ -2525,7 +2273,7 @@ VOID CFight::PAL_BattlePlayerValidateAction(WORD wPlayerIndex)
 			// Attack enemies instead if player is not confused
 			//
 			fToEnemy = TRUE;
-			g_Battle.rgPlayer[wPlayerIndex].action.ActionType = kBattleActionAttack;
+			g_Battle.rgPlayer[wPlayerIndex].action.ActionType = BATTLEACTIONTYPE::kBattleActionAttack;
 		}
 		else
 		{
@@ -2544,7 +2292,7 @@ VOID CFight::PAL_BattlePlayerValidateAction(WORD wPlayerIndex)
 				// Attack enemies if no one else is alive
 				//
 				fToEnemy = TRUE;
-				g_Battle.rgPlayer[wPlayerIndex].action.ActionType = kBattleActionAttack;
+				g_Battle.rgPlayer[wPlayerIndex].action.ActionType = BATTLEACTIONTYPE::kBattleActionAttack;
 			}
 		}
 		break;
@@ -2554,7 +2302,7 @@ VOID CFight::PAL_BattlePlayerValidateAction(WORD wPlayerIndex)
 	//
 	// Check if player can attack all enemies at once, or attack one enemy
 	//
-	if (g_Battle.rgPlayer[wPlayerIndex].action.ActionType == kBattleActionAttack)
+	if (g_Battle.rgPlayer[wPlayerIndex].action.ActionType == BATTLEACTIONTYPE::kBattleActionAttack)
 	{
 		if (sTarget == -1)
 		{
@@ -2596,9 +2344,6 @@ VOID CFight::PAL_BattlePlayerPerformAction(WORD wPlayerIndex)
 	WORD     str, def, res, wObject, wMagicNum;
 	BOOL     fCritical;
 	WORD     rgwCoopPos[3][2] = { {208, 157}, {234, 170}, {260, 183} };
-#ifndef PAL_CLASSIC
-	BOOL     fPoisoned, fCheckPoison;
-#endif
 
 	g_Battle.wMovingPlayerIndex = wPlayerIndex;
 	g_Battle.iBlow = 0;
@@ -2611,7 +2356,7 @@ VOID CFight::PAL_BattlePlayerPerformAction(WORD wPlayerIndex)
 
 	switch (g_Battle.rgPlayer[wPlayerIndex].action.ActionType)
 	{
-	case kBattleActionAttack:
+	case BATTLEACTIONTYPE::kBattleActionAttack:
 	{
 		WORD wTimes = 1;
 		if (sTarget != -1)
@@ -2623,7 +2368,7 @@ VOID CFight::PAL_BattlePlayerPerformAction(WORD wPlayerIndex)
 			{
 				str = PAL_GetPlayerAttackStrength(wPlayerRole);
 				def = PAL_New_GetEnemyDefense(sTarget);
-				res = PAL_New_GetEnemyPhysicalResistance(sTarget);
+				res = PAL_New_GetEnemyPhysicalResistance(+sTarget);
 				fCritical = FALSE;
 
 				iDamage = PAL_CalcPhysicalAttackDamage(str, def, res) + RandomLong(1, 2);
@@ -2721,7 +2466,7 @@ VOID CFight::PAL_BattlePlayerPerformAction(WORD wPlayerIndex)
 					g_Battle.rgEnemy[index[i]].dwActualHealth -= iDamage;
 
 					division++;
-					division =std::min(division, 3);
+					division = std::min(division, 3);
 				}
 
 				PAL_BattleShowPlayerAttackAnim(wPlayerIndex, fCritical);
@@ -2739,7 +2484,7 @@ VOID CFight::PAL_BattlePlayerPerformAction(WORD wPlayerIndex)
 		break;
 	}
 
-	case kBattleActionAttackMate:
+	case BATTLEACTIONTYPE::kBattleActionAttackMate:
 	{
 
 		if (PAL_IsPlayerDying(wPlayerRole))
@@ -2839,9 +2584,8 @@ VOID CFight::PAL_BattlePlayerPerformAction(WORD wPlayerIndex)
 		break;
 	}
 
-	case kBattleActionCoopMagic:
+	case BATTLEACTIONTYPE::kBattleActionCoopMagic:
 	{
-
 
 		wObject = PAL_GetPlayerCooperativeMagic(gpGlobals->rgParty[wPlayerIndex].wPlayerRole);
 		wMagicNum = gpGlobals->g.rgObject[wObject].magic.wMagicNumber;
@@ -2943,12 +2687,7 @@ VOID CFight::PAL_BattlePlayerPerformAction(WORD wPlayerIndex)
 			//
 			// Reset the time meter for everyone when using coopmagic
 			//
-#ifdef PAL_CLASSIC
-			g_Battle.rgPlayer[i].state = kFighterWait;
-#else
-			g_Battle.rgPlayer[i].flTimeMeter = 0;
-			g_Battle.rgPlayer[i].flTimeSpeedModifier = 2;
-#endif
+			g_Battle.rgPlayer[i].state = FIGHTERSTATE::kFighterWait;
 		}
 
 		PAL_BattleBackupStat(); // so that "damages" to players won't be shown
@@ -3026,19 +2765,19 @@ VOID CFight::PAL_BattlePlayerPerformAction(WORD wPlayerIndex)
 		break;
 	}
 
-	case kBattleActionDefend:
+	case BATTLEACTIONTYPE::kBattleActionDefend:
 	{
 
 		g_Battle.rgPlayer[wPlayerIndex].fDefending = TRUE;
 		gpGlobals->Exp.rgDefenseExp[wPlayerRole].wCount += 2;
-		if (ggConfig->m_Function_Set[9])
+		if (cfgDefBoostActive)
 		{
 			//本回合，回合数
-			g_Battle.rgPlayer[wPlayerRole].fDefenAction = ggConfig->m_Function_Set[9];
+			g_Battle.rgPlayer[wPlayerRole].fDefenAction = cfgDefBoostActive;
 		}
 		break;
 	}
-	case kBattleActionFlee:
+	case BATTLEACTIONTYPE::kBattleActionFlee:
 	{
 		str = PAL_GetPlayerFleeRate(wPlayerRole);
 		def = 0;
@@ -3051,11 +2790,10 @@ VOID CFight::PAL_BattlePlayerPerformAction(WORD wPlayerIndex)
 			}
 
 			def += (SHORT)(g_Battle.rgEnemy[i].e.wFleeRate);
-			if (ggConfig->m_Function_Set[1])//#ifdef EDIT_DAMAGE_CALC
+			if (cfgDmgFormula)//#ifdef cfgDmgFormula
 				def += g_Battle.rgEnemy[i].e.wLevel * 3;
-			else//#else
+			else
 				def += (g_Battle.rgEnemy[i].e.wLevel + 6) * 2;
-			//#endif
 		}
 
 		if ((SHORT)def < 0)
@@ -3095,14 +2833,14 @@ VOID CFight::PAL_BattlePlayerPerformAction(WORD wPlayerIndex)
 		break;
 	}
 
-	case kBattleActionMagic:
+	case BATTLEACTIONTYPE::kBattleActionMagic:
 	{
 
 		wObject = g_Battle.rgPlayer[wPlayerIndex].action.wActionID;
 		wMagicNum = gpGlobals->g.rgObject[wObject].magic.wMagicNumber;
 
 		//#ifdef PAL_WIN95
-		if (ggConfig->fIsWIN95)
+		if (cfgIsWin95)
 			PAL_BattleShowPlayerPreMagicAnim(wPlayerIndex, wObject);//
 		else
 			//#else
@@ -3186,7 +2924,7 @@ VOID CFight::PAL_BattlePlayerPerformAction(WORD wPlayerIndex)
 				else
 				{
 					//#ifdef PAL_WIN95
-					if (ggConfig->fIsWIN95)
+					if (cfgIsWin95)
 						PAL_BattleShowPlayerOffMagicAnim(wPlayerIndex, wObject, sTarget, FALSE);
 					//#else
 					else
@@ -3225,7 +2963,7 @@ VOID CFight::PAL_BattlePlayerPerformAction(WORD wPlayerIndex)
 		break;
 	}
 
-	case kBattleActionThrowItem:
+	case BATTLEACTIONTYPE::kBattleActionThrowItem:
 	{
 
 		wObject = g_Battle.rgPlayer[wPlayerIndex].action.wActionID;
@@ -3268,7 +3006,7 @@ VOID CFight::PAL_BattlePlayerPerformAction(WORD wPlayerIndex)
 		break;
 	}
 
-	case kBattleActionUseItem:           //使用物品
+	case BATTLEACTIONTYPE::kBattleActionUseItem:           //使用物品
 	{
 
 		wObject = g_Battle.rgPlayer[wPlayerIndex].action.wActionID;
@@ -3294,22 +3032,11 @@ VOID CFight::PAL_BattlePlayerPerformAction(WORD wPlayerIndex)
 			PAL_AddItemToInventory(wObject, -1);
 		}
 
-		if (g_Battle.iHidingTime < 0)
+		//if (g_Battle.iHidingTime < 0)
+		if (PAL_GetHidingTime() < 0)
 		{
-#ifdef PAL_CLASSIC
-			g_Battle.iHidingTime = -g_Battle.iHidingTime;
-#else
-			g_Battle.iHidingTime = -g_Battle.iHidingTime * 20;
-
-			if (gpGlobals->bBattleSpeed > 1)
-			{
-				g_Battle.iHidingTime *= 1 + (gpGlobals->bBattleSpeed - 1) * 0.5;
-			}
-			else
-			{
-				g_Battle.iHidingTime *= 1.2;
-			}
-#endif
+			//g_Battle.iHidingTime = -g_Battle.iHidingTime;
+			PAL_SetHidingTime(-PAL_GetHidingTime());
 			PAL_BattleBackupScene();
 			PAL_BattleMakeScene();
 			RenderBlendCopy(gpTextureReal, g_Battle.lpSceneBuf);;
@@ -3323,7 +3050,7 @@ VOID CFight::PAL_BattlePlayerPerformAction(WORD wPlayerIndex)
 		break;
 	}
 
-	case kBattleActionPass:
+	case BATTLEACTIONTYPE::kBattleActionPass:
 	{
 
 		break;
@@ -3333,74 +3060,13 @@ VOID CFight::PAL_BattlePlayerPerformAction(WORD wPlayerIndex)
 	//
 	// Revert this player back to waiting state.
 	//
-	g_Battle.rgPlayer[wPlayerIndex].state = kFighterWait;
-	g_Battle.rgPlayer[wPlayerIndex].flTimeMeter = 0;
+	g_Battle.rgPlayer[wPlayerIndex].state = FIGHTERSTATE::kFighterWait;
 
 	PAL_BattlePostActionCheck(FALSE);
 
-#ifndef PAL_CLASSIC
-	//
-	// Only check for poisons when the battle is not ended
-	//
-	fCheckPoison = FALSE;
-
-	if (g_Battle.BattleResult == kBattleResultOnGoing)
-	{
-		for (i = 0; i <= g_Battle.wMaxEnemyIndex; i++)
-		{
-			if (g_Battle.rgEnemy[i].wObjectID != 0)
-			{
-				fCheckPoison = TRUE;
-				break;
-			}
-		}
-	}
-
-	//
-	// Check for poisons
-	//
-	if (fCheckPoison)
-	{
-		fPoisoned = FALSE;
-		PAL_BattleBackupStat();
-
-		for (i = 0; i < MAX_POISONS; i++)
-		{
-			wObject = gpGlobals->rgPoisonStatus[i][wPlayerIndex].wPoisonID;
-
-			if (wObject != 0)
-			{
-				fPoisoned = TRUE;
-				gpGlobals->rgPoisonStatus[i][wPlayerIndex].wPoisonScript =
-					PAL_RunTriggerScript(gpGlobals->rgPoisonStatus[i][wPlayerIndex].wPoisonScript, wPlayerRole);
-			}
-		}
-
-		if (fPoisoned)
-		{
-			PAL_BattleDelay(3, 0, TRUE);
-			PAL_BattleUpdateFighters();
-			if (PAL_BattleDisplayStatChange())
-			{
-				PAL_BattleDelay(6, 0, TRUE);
-			}
-		}
-	}
-
-	//
-	// Update statuses
-	//
-	for (i = 0; i < kStatusAll; i++)
-	{
-		if (gpGlobals->rgPlayerStatus[wPlayerRole][i] > 0)
-		{
-			gpGlobals->rgPlayerStatus[wPlayerRole][i]--;
-		}
-	}
-#endif
 }
 
-INT CFight:: PAL_BattleEnemySelectTargetIndex(VOID)
+INT CFight::PAL_BattleEnemySelectTargetIndex(VOID)const
 /*++
   功能：    Select a attackable player randomly.
   参数：    None.
@@ -3451,11 +3117,9 @@ VOID CFight::PAL_BattleEnemyPerformAction(
 	SHORT      sElementalResistance[NUM_MAGIC_ELEMENTAL] = { 0 };
 	SHORT      sPoisonResistance;
 	WORD       wPlayerRole, w, wMagic, wMagicNum;
-//.#ifdef DONOT_SELECT_TARGET_RANDOMLY_TOTALLY
-//#endif
 	SHORT      sTarget;
 	INT			iDamage;
-	BOOL       fAutoDefend = FALSE, rgfMagAutoDefend[MAX_PLAYERS_IN_PARTY]{0};
+	BOOL       fAutoDefend = FALSE, rgfMagAutoDefend[MAX_PLAYERS_IN_PARTY]{ 0 };
 
 	g_Battle.iBlow = 0;
 
@@ -3479,9 +3143,9 @@ VOID CFight::PAL_BattleEnemyPerformAction(
 
 	wMagic = g_Battle.rgEnemy[wEnemyIndex].e.wMagic;
 
-	if (ggConfig->m_Function_Set[16] == 0)//不完全是随机选择目标
+	if (cfgSemiRandomTgt == 0)//不完全是随机选择目标
 		sTarget = PAL_BattleEnemySelectTargetIndex();
-	else
+	else //基础值大于0时，较大几率选择生命值最低的角色。不大于0时，较大几率选择生命值最高的角色。
 	{
 		WORD tMagicNum;
 		if (wMagic == 0 || wMagic == 0xFFFF)
@@ -3498,7 +3162,7 @@ VOID CFight::PAL_BattleEnemyPerformAction(
 		}
 		else if (wMagic == 0 || (SHORT)gpGlobals->g.lprgMagic[tMagicNum].wBaseDamage >= 0)
 		{
-			if (RandomLong(0, 9) < 7)
+			if (RandomLong(0, 9) < 6)
 			{
 				sTarget = PAL_New_GetPlayerIndexByHealth(TRUE);
 			}
@@ -3519,13 +3183,14 @@ VOID CFight::PAL_BattleEnemyPerformAction(
 			}
 		}
 	}
-//#endif//不完全是随机选择目标
+	//#endif//不完全是随机选择目标
 
 	wPlayerRole = gpGlobals->rgParty[sTarget].wPlayerRole;
 
 	if (g_Battle.rgEnemy[wEnemyIndex].rgwStatus[kStatusSleep] > 0 ||
 		g_Battle.rgEnemy[wEnemyIndex].rgwStatus[kStatusParalyzed] > 0 ||
-		g_Battle.iHidingTime > 0)
+		//g_Battle.iHidingTime > 0)
+		PAL_GetHidingTime() > 0)
 	{
 		//
 		// Do nothing
@@ -3540,7 +3205,7 @@ VOID CFight::PAL_BattleEnemyPerformAction(
 	{
 		// TODO
 		//敌方混乱
-		if (ggConfig->m_Function_Set[25])
+		if (cfgConfuseMode)
 		{
 			i = 5;
 			if (PAL_New_GetAliveEnemyNum() > 1)
@@ -3561,7 +3226,7 @@ VOID CFight::PAL_BattleEnemyPerformAction(
 					PAL_New_GetEnemyDefense(sTarget),
 					PAL_New_GetEnemyPhysicalResistance(sTarget));
 				iDamage += RandomLong(0, 1);
-				g_Battle.rgEnemy[sTarget].dwActualHealth -= std::min(iDamage,(int) g_Battle.rgEnemy[sTarget].dwActualHealth);
+				g_Battle.rgEnemy[sTarget].dwActualHealth -= std::min(iDamage, (int)g_Battle.rgEnemy[sTarget].dwActualHealth);
 
 
 				//声音
@@ -3596,7 +3261,7 @@ VOID CFight::PAL_BattleEnemyPerformAction(
 			}
 			else//没有队友，攻击我方
 			{
-				if (ggConfig->m_Function_Set[25] == 2 && g_Battle.rgEnemy[wEnemyIndex].dwActualHealth)
+				if (cfgConfuseMode == 2 && g_Battle.rgEnemy[wEnemyIndex].dwActualHealth)
 				{
 					sTarget = PAL_BattleEnemySelectTargetIndex();//重新选择
 					PAL_BattleEnemyPhysical(wEnemyIndex, sTarget);
@@ -3606,7 +3271,7 @@ VOID CFight::PAL_BattleEnemyPerformAction(
 		goto end;
 	}
 	//
-	if (ggConfig->m_Function_Set[22] == 0)//自动防御值为0，手动防御
+	if (cfgAutoDefRatio == 0)//自动防御值为0，手动防御
 		//新增每次行动前。闪动一次//////
 	{
 
@@ -3684,7 +3349,7 @@ VOID CFight::PAL_BattleEnemyPerformAction(
 			}
 		}
 
-		
+
 		if (gpGlobals->g.lprgMagic[wMagicNum].wType != kMagicTypeNormal)
 		{
 			sTarget = -1;
@@ -3694,9 +3359,9 @@ VOID CFight::PAL_BattleEnemyPerformAction(
 				w = gpGlobals->rgParty[i].wPlayerRole;
 
 				if (PAL_New_IfPlayerCanMove(w)
-					&& (PAL_New_GetTrueByPercentage(ggConfig->m_Function_Set[22])
+					&& (PAL_New_GetTrueByPercentage(cfgAutoDefRatio)
 						|| PAL_GetManuallyDefend())
-						&& gpGlobals->g.PlayerRoles.rgwHP[w] != 0)
+					&& gpGlobals->g.PlayerRoles.rgwHP[w] != 0)
 				{
 					rgfMagAutoDefend[i] = TRUE;
 					g_Battle.rgPlayer[i].wCurrentFrame = 3;
@@ -3707,9 +3372,9 @@ VOID CFight::PAL_BattleEnemyPerformAction(
 				}
 			}
 		}
-		else if (PAL_New_IfPlayerCanMove(wPlayerRole) && 
-			(PAL_New_GetTrueByPercentage(ggConfig->m_Function_Set[22])
-				||PAL_GetManuallyDefend()))
+		else if (PAL_New_IfPlayerCanMove(wPlayerRole) &&
+			(PAL_New_GetTrueByPercentage(cfgAutoDefRatio)
+				|| PAL_GetManuallyDefend()))
 		{	//选择的目标不能是HP等于0的，所以不用在此判断HP不等于0
 			fAutoDefend = TRUE;
 			g_Battle.rgPlayer[sTarget].wCurrentFrame = 3;
@@ -3751,24 +3416,24 @@ VOID CFight::PAL_BattleEnemyPerformAction(
 
 					//str *= 0.8;
 
-					iDamage = PAL_CalcMagicDamage(str, def, sElementalResistance, sPoisonResistance, wMagic,w);
+					iDamage = PAL_CalcMagicDamage(str, def, sElementalResistance, sPoisonResistance, wMagic, w);
 
 					iDamage /= ((g_Battle.rgPlayer[i].fDefending ? 2 : 1) *
 						((gpGlobals->rgPlayerStatus[w][kStatusProtect] > 0) ? 2 : 1)) +
 						(rgfMagAutoDefend[i] ? 1 : 0);
 
-//#ifdef GAIN_MORE_HIDDEN_EXP
-					if (ggConfig->m_Function_Set[54])//更多的隐藏经验
+					//#ifdef GAIN_MORE_HIDDEN_EXP
+					if (cfgHiddenExp)//更多的隐藏经验
 						if (rgfMagAutoDefend[i] == TRUE)
 						{
 							gpGlobals->Exp.rgDefenseExp[wPlayerRole].wCount += RandomLong(0, 1);
 							gpGlobals->Exp.rgDexterityExp[wPlayerRole].wCount += RandomLong(0, 1);
 							gpGlobals->Exp.rgFleeExp[wPlayerRole].wCount += RandomLong(0, 1);
 						}
-//#endif
+					//#endif
 
 					iDamage = std::max(iDamage, 0);
-					iDamage = std::min(iDamage,(int) gpGlobals->g.PlayerRoles.rgwHP[w]);
+					iDamage = std::min(iDamage, (int)gpGlobals->g.PlayerRoles.rgwHP[w]);
 					if (!debugSwitch[fIsInvincible])
 						gpGlobals->g.PlayerRoles.rgwHP[w] -= iDamage;
 
@@ -3792,29 +3457,29 @@ VOID CFight::PAL_BattleEnemyPerformAction(
 				}
 				sPoisonResistance = PAL_GetPlayerPoisonResistance(wPlayerRole);
 
-				iDamage = PAL_CalcMagicDamage(str, def, sElementalResistance, sPoisonResistance, wMagic,wPlayerRole);
+				iDamage = PAL_CalcMagicDamage(str, def, sElementalResistance, sPoisonResistance, wMagic, wPlayerRole);
 
 				iDamage /= ((g_Battle.rgPlayer[sTarget].fDefending ? 2 : 1) *
 					((gpGlobals->rgPlayerStatus[wPlayerRole][kStatusProtect] > 0) ? 2 : 1)) +
 					(fAutoDefend ? 1 : 0);
 
-//#ifdef GAIN_MORE_HIDDEN_EXP
-				if (ggConfig->m_Function_Set[54])//更多的隐藏经验
+				//#ifdef GAIN_MORE_HIDDEN_EXP
+				if (cfgHiddenExp)//更多的隐藏经验
 					if (fAutoDefend == TRUE)
 					{
 						gpGlobals->Exp.rgDefenseExp[wPlayerRole].wCount += RandomLong(0, 1);
 						gpGlobals->Exp.rgDexterityExp[wPlayerRole].wCount += RandomLong(0, 1);
 						gpGlobals->Exp.rgFleeExp[wPlayerRole].wCount += RandomLong(0, 1);
 					}
-//#endif
+				//#endif
 
 				iDamage = std::max(iDamage, 0);
-				iDamage = std::min(iDamage,(int) gpGlobals->g.PlayerRoles.rgwHP[wPlayerRole]);
+				iDamage = std::min(iDamage, (int)gpGlobals->g.PlayerRoles.rgwHP[wPlayerRole]);
 
-//#ifndef INVINCIBLE
+				//#ifndef INVINCIBLE
 				if (!debugSwitch[fIsInvincible])
 					gpGlobals->g.PlayerRoles.rgwHP[wPlayerRole] -= iDamage;
-//#endif
+				//#endif
 
 				if (gpGlobals->g.PlayerRoles.rgwHP[wPlayerRole] == 0)
 				{
@@ -3885,44 +3550,7 @@ VOID CFight::PAL_BattleEnemyPerformAction(
 		PAL_BattleEnemyPhysical(wEnemyIndex, sTarget);
 	}
 end:
-#ifndef PAL_CLASSIC
-	//
-	// Check poisons
-	//
-	if (!g_Battle.rgEnemy[wEnemyIndex].fDualMove)
-	{
-		PAL_BattleBackupStat();
-
-		for (i = 0; i < MAX_POISONS; i++)
-		{
-			if (g_Battle.rgEnemy[wEnemyIndex].rgPoisons[i].wPoisonID != 0)
-			{
-				g_Battle.rgEnemy[wEnemyIndex].rgPoisons[i].wPoisonScript =
-					PAL_RunTriggerScript(g_Battle.rgEnemy[wEnemyIndex].rgPoisons[i].wPoisonScript, wEnemyIndex);
-			}
-		}
-
-		if (PAL_BattleDisplayStatChange())
-		{
-			PAL_BattleDelay(6, 0, FALSE);
-		}
-	}
-
-	PAL_BattlePostActionCheck(FALSE);
-
-	//
-	// Update statuses
-	//
-	for (i = 0; i < kStatusAll; i++)
-	{
-		if (g_Battle.rgEnemy[wEnemyIndex].rgwStatus[i] > 0)
-		{
-			g_Battle.rgEnemy[wEnemyIndex].rgwStatus[i]--;
-		}
-	}
-#else
 	i = 0; // do nothing
-#endif
 
 }
 
@@ -3971,8 +3599,7 @@ VOID CFight::PAL_BattleStealFromEnemy(
 	g_Battle.rgPlayer[iPlayerIndex].pos = PAL_XY(x, y);
 	PAL_BattleDelay(3, 0, TRUE);
 
-	g_Battle.rgPlayer[iPlayerIndex].state = kFighterWait;
-	g_Battle.rgPlayer[iPlayerIndex].flTimeMeter = 0;
+	g_Battle.rgPlayer[iPlayerIndex].state = FIGHTERSTATE::kFighterWait;
 	PAL_BattleUpdateFighters();
 	PAL_BattleDelay(1, 0, TRUE);
 
@@ -4017,12 +3644,8 @@ VOID CFight::PAL_BattleStealFromEnemy(
 
 		if (!s.empty())
 		{
-#ifdef PAL_CLASSIC
 			PAL_StartDialog(kDialogCenterWindow, 0, 0, FALSE);
 			PAL_ShowDialogText(s.c_str());
-#else
-			PAL_BattleUIShowText(s, 800);
-#endif
 		}
 	}
 }
@@ -4056,12 +3679,12 @@ VOID CFight::PAL_BattleSimulateMagic(
 	// Show the magic animation
 	//
 //fdef PAL_WIN95
-	if (ggConfig->fIsWIN95)
+	if (cfgIsWin95)
 		PAL_BattleShowPlayerOffMagicAnim(0xFFFF, wMagicObjectID, sTarget, FALSE);
 	//lse
 	else
 		PAL_BattleShowPlayerOffMagicAnim(0xFFFF, wMagicObjectID, sTarget);
-//ndif
+	//ndif
 
 	wMagicNumber = gpGlobals->g.rgObject[wMagicObjectID].magic.wMagicNumber;
 	wMagicDamage = gpGlobals->g.lprgMagic[wMagicNumber].wBaseDamage;
@@ -4137,15 +3760,13 @@ VOID CFight::PAL_New_ApplyMagicDamageToEnemy(
 		iDamage = PAL_CalcMagicDamage(wBaseDamage, (WORD)def, sElemResistance, sPoisonResistance, wMagicObjectID);
 		iDamage = fOneDamageAtLeast ? std::max(1, iDamage) : std::max(0, iDamage);
 		iDamage = std::min(iDamage, MAX_DAMAGE);
-		iDamage = std::min(iDamage,(int) g_Battle.rgEnemy[sTarget].dwActualHealth);
+		iDamage = std::min(iDamage, (int)g_Battle.rgEnemy[sTarget].dwActualHealth);
 
 		g_Battle.rgEnemy[sTarget].dwActualHealth -= iDamage;
 	}
 }
 
-VOID CFight::PAL_BattleUIUpdate(
-	VOID
-)
+void  CFight::PAL_BattleUIUpdate()
 /*++
   Purpose:    Update the status of battle UI.
   更新战斗界面的状态。
@@ -4153,19 +3774,14 @@ VOID CFight::PAL_BattleUIUpdate(
   Return value:      None.
   --*/
 {
-	//int              i, j, x, y;
-	//WORD             wPlayerRole, w;
 
 	auto& gpSpriteUI = gpGlobals->gpSpriteUI;
 
-	s_iFrame++;
+	//当不在玩家选择阶段，计数增加
+	if (g_Battle.Phase != BATTLEPHASE::kBattlePhaseSelectAction)
+		m_TimeCount++;
+	s_iFrame ^= 1;
 
-	if(ggConfig->m_Function_Set[2])
-	//在战斗中显示敌我数据
-		if (gpGlobals->fShowDataInBattle && g_Battle.BattleResult == kBattleResultOnGoing)
-		{
-			PAL_New_BattleUIShowData();
-		}
 
 	//若攻击方式为自动攻击并且不在自动战斗模式下（即在战斗界面中的杂项菜单中选择了“围攻”）
 	if (g_Battle.UI.fAutoAttack && !gpGlobals->fAutoBattle)
@@ -4192,10 +3808,10 @@ VOID CFight::PAL_BattleUIUpdate(
 	if (GetKeyPress() & kKeyAuto)
 	{
 		g_Battle.UI.fAutoAttack = !g_Battle.UI.fAutoAttack;
-		g_Battle.UI.MenuState = kBattleMenuMain;
+		g_Battle.UI.MenuState = BATTLEMENUSTATE::kBattleMenuMain;
 	}
 
-	if (g_Battle.Phase == kBattlePhasePerformAction)
+	if (g_Battle.Phase == BATTLEPHASE::kBattlePhasePerformAction)
 	{
 		goto end;
 	}
@@ -4214,7 +3830,7 @@ VOID CFight::PAL_BattleUIUpdate(
 		goto end;
 	}
 
-	if (ggConfig->m_Function_Set[2])
+	if (cfgShowBtlData)
 	{
 		//在战斗中显示相关数据开关
 		if (GetKeyPress() & kKeyGetInfo)
@@ -4230,14 +3846,14 @@ VOID CFight::PAL_BattleUIUpdate(
 		}
 	}
 
-	if (g_Battle.UI.state != kBattleUIWait)
+	if (g_Battle.UI.state != BATTLEUISTATE::kBattleUIWait)
 	{
 		auto wPlayerRole = gpGlobals->rgParty[g_Battle.UI.wCurPlayerIndex].wPlayerRole;
 
 		if (gpGlobals->g.PlayerRoles.rgwHP[wPlayerRole] == 0 &&
 			gpGlobals->rgPlayerStatus[wPlayerRole][kStatusPuppet])
 		{
-			g_Battle.UI.wActionType = kBattleActionAttack;
+			g_Battle.UI.wActionType = BATTLEACTIONTYPE::kBattleActionAttack;
 
 			if (PAL_PlayerCanAttackAll(gpGlobals->rgParty[g_Battle.UI.wCurPlayerIndex].wPlayerRole))
 			{
@@ -4259,21 +3875,21 @@ VOID CFight::PAL_BattleUIUpdate(
 			gpGlobals->rgPlayerStatus[wPlayerRole][kStatusSleep] != 0 ||
 			gpGlobals->rgPlayerStatus[wPlayerRole][kStatusParalyzed] != 0)
 		{
-			g_Battle.UI.wActionType = kBattleActionPass;
+			g_Battle.UI.wActionType = BATTLEACTIONTYPE::kBattleActionPass;
 			PAL_BattleCommitAction(FALSE);
 			goto end; // don't go further
 		}
 
 		if (gpGlobals->rgPlayerStatus[wPlayerRole][kStatusConfused] != 0)
 		{
-			g_Battle.UI.wActionType = kBattleActionAttackMate;
+			g_Battle.UI.wActionType = BATTLEACTIONTYPE::kBattleActionAttackMate;
 			PAL_BattleCommitAction(FALSE);
 			goto end; // don't go further
 		}
 
 		if (g_Battle.UI.fAutoAttack)
 		{
-			g_Battle.UI.wActionType = kBattleActionAttack;
+			g_Battle.UI.wActionType = BATTLEACTIONTYPE::kBattleActionAttack;
 
 			if (PAL_PlayerCanAttackAll(gpGlobals->rgParty[g_Battle.UI.wCurPlayerIndex].wPlayerRole))
 			{
@@ -4305,16 +3921,13 @@ VOID CFight::PAL_BattleUIUpdate(
 
 	switch (g_Battle.UI.state)
 	{
-	case kBattleUIWait:
+	case BATTLEUISTATE::kBattleUIWait:
 	{
 		if (!g_Battle.fEnemyCleared)
 		{
-			
-			PAL_BattlePlayerCheckReady();
-
 			for (int i = 0; i <= gpGlobals->wMaxPartyMemberIndex; i++)
 			{
-				if (g_Battle.rgPlayer[i].state == kFighterCom)
+				if (g_Battle.rgPlayer[i].state == FIGHTERSTATE::kFighterCom)
 				{
 					PAL_BattleUIPlayerReady(i);
 					break;
@@ -4324,27 +3937,27 @@ VOID CFight::PAL_BattleUIUpdate(
 		break;
 	}
 
-	case kBattleUISelectMove:
+	case BATTLEUISTATE::kBattleUISelectMove:
 	{
 		//
-		// Draw the icons
+		// Draw the icons and selecting
 		PAL_BattleUISelectMove();
-	
+
 		break;
 	}
 
-	case kBattleUISelectTargetEnemy:
+	case BATTLEUISTATE::kBattleUISelectTargetEnemy:
 	{
 		PAL_BattleUISelectTargetEnemy();
 		break;
 	}
 
-	case kBattleUISelectTargetPlayer:
+	case BATTLEUISTATE::kBattleUISelectTargetPlayer:
 	{
 		PAL_BattleUISelectTargetPlayer();
 		break;
 	}
-	case kBattleUISelectTargetEnemyAll:
+	case BATTLEUISTATE::kBattleUISelectTargetEnemyAll:
 	{
 		//
 		// Don't bother selecting
@@ -4354,41 +3967,51 @@ VOID CFight::PAL_BattleUIUpdate(
 		break;
 	}
 
-	case kBattleUISelectTargetPlayerAll:
+	case BATTLEUISTATE::kBattleUISelectTargetPlayerAll:
 	{
 		//
 		// Don't bother selecting
 		g_Battle.UI.wSelectedIndex = (WORD)-1;
 		PAL_BattleCommitAction(FALSE);
-		break;}
+		break;
+	}
 	}
 
 end:
 	//
 	// Show the text message if there is one.
 	//
-
+	if (cfgShowBtlData)
+		//在战斗中显示敌我数据
+		if (gpGlobals->fShowDataInBattle && g_Battle.BattleResult == kBattleResultOnGoing)
+		{
+			PAL_New_BattleUIShowData();
+		}
 	//
 	// Draw the numbers
-	//显示数字
 	for (int i = 0; i < BATTLEUI_MAX_SHOWNUM; i++)
 	{
 		if (g_Battle.UI.rgShowNum[i].wNum > 0)
 		{
-			if ((SDL_GetTicks_New() - g_Battle.UI.rgShowNum[i].dwTime) / ggConfig->m_Function_Set[23] > 10)
+			if ((SDL_GetTicks_New() - g_Battle.UI.rgShowNum[i].dwTime) / cfgBtlFrameMs > 10)
 			{
 				g_Battle.UI.rgShowNum[i].wNum = 0;
 			}
 			else
 			{
 				PAL_DrawNumber(g_Battle.UI.rgShowNum[i].wNum, 5,
-					PAL_XY(PAL_X(g_Battle.UI.rgShowNum[i].pos), 
-						PAL_Y(g_Battle.UI.rgShowNum[i].pos) - 
-						(SDL_GetTicks_New() - g_Battle.UI.rgShowNum[i].dwTime) / ggConfig->m_Function_Set[23]),
+					PAL_XY(PAL_X(g_Battle.UI.rgShowNum[i].pos),
+						PAL_Y(g_Battle.UI.rgShowNum[i].pos) -
+						(SDL_GetTicks_New() - g_Battle.UI.rgShowNum[i].dwTime) / cfgBtlFrameMs),
 					g_Battle.UI.rgShowNum[i].color, kNumAlignRight);
 			}
 		}
 	}
+	//
+	if (isNoClassic())
+		PAL_ShowProgressBar();
+	//// ???
+	PAL_DrawNumber(m_TimeCount, 6, PAL_XY(280, 30), kNumColorYellow, kNumAlignRight);
 
 	PAL_ClearKeyState();
 }
@@ -4517,38 +4140,36 @@ INT CFight::PAL_CalcPhysicalAttackDamage(
 )
 {
 	//重载，加入我方主动防御加成
-
 	float dag = 1.0;
-	if(ggConfig->m_Function_Set[9])
+	if (cfgDefBoostActive)
 		if (wPlayerRole >= 0 && g_Battle.rgPlayer[wPlayerRole].fDefenAction && g_Battle.fEnemyMoving)
 		{
 			wDefense *= 3;
-			//dag = 0.8;
 		}
 
-	return dag * CBattleBase::PAL_CalcPhysicalAttackDamage(wAttackStrength, wDefense, wAttackResistance);
+	return dag * PAL_CalcPhysicalAttackDamageBase(wAttackStrength, wDefense, wAttackResistance);
 }
 
-INT CFight::PAL_CalcMagicDamage(
+const INT CFight::PAL_CalcMagicDamage(
 	WORD			wMagicStrength,
 	WORD			wDefense,
 	SHORT			sElementalResistance[NUM_MAGIC_ELEMENTAL],
 	SHORT			sPoisonResistance,
 	WORD			wMagicID,
-	INT			wPlayerRole
-)
+	INT				wPlayerRole
+)const
 //加入我方主动防御加成
 {
 	float  def = 1.0;
 	int ret = 0;
-	if(ggConfig->m_Function_Set[9])
+	if (cfgDefBoostActive)
 		if (wPlayerRole >= 0 && g_Battle.rgPlayer[wPlayerRole].fDefenAction && g_Battle.fEnemyMoving)
 		{
 			//本轮主动防御
 			wDefense *= 2;
 			def = 0.6;
 		}
-	ret = CBattleBase::PAL_CalcMagicDamage(
+	ret = PAL_CalcMagicDamageBase(
 		wMagicStrength,
 		wDefense,
 		sElementalResistance,
@@ -4557,15 +4178,121 @@ INT CFight::PAL_CalcMagicDamage(
 	return ret;
 }
 
+const INT CFight::PAL_CalcMagicDamageBase(DWORD wMagicStrength,
+	DWORD wDefense, SHORT sElementalResistance[NUM_MAGIC_ELEMENTAL], SHORT sPoisonResistance, WORD wMagicID)const
+/*++
+功能：     Calculate the damage of magic.
+计算法术伤害值
+参数：     [IN]  wMagicStrength - magic strength of attacker.
+[IN]  wDefense - defense value of inflictor.
+[IN]  rgwElementalResistance - inflictor's resistance to the elemental magics.
+[IN]  wPoisonResistance - inflictor's resistance to poison.
+[IN]  wMagicID - object ID of the magic.
+攻击者灵力值，被攻击者防御值，被攻击者对各属性伤害的抗性，被攻击者毒抗，法术id
+返回值： The damage value of the magic attack.
+法术伤害值
+--*/
+{
+	INT             iDamage;
+	WORD            wElem;
+	WORD	        wBaseDamage;
+	WORD			wMagicNumber;
 
-VOID CFight::PAL_BattleEnemyPhysical(WORD wEnemyIndex, WORD wPlayerID)
+	wMagicNumber = gpGlobals->g.rgObject[wMagicID].magic.wMagicNumber;
+	wBaseDamage = gpGlobals->g.lprgMagic[wMagicNumber].wBaseDamage;
+
+	if ((SHORT)wBaseDamage < 0)
+	{
+		return 0;
+	}
+
+	// Formula courtesy of palxex and shenyanduxing
+	wMagicStrength *= RandomFloat(1, 1.1);
+
+	iDamage = PAL_CalcBaseDamage(wMagicStrength, wDefense);
+
+	wElem = gpGlobals->g.lprgMagic[wMagicNumber].wElemental;
+
+	if (cfgDmgFormula) //#ifdef cfgDmgFormula
+	{
+		if (wElem >= 1 && wElem <= 6)
+		{
+			iDamage /= 2;
+			iDamage += wBaseDamage * 2 / 3;
+		}
+		else
+		{
+			iDamage /= 3;
+			iDamage += wBaseDamage;
+		}
+	}
+	else//#else
+	{
+		iDamage /= 4;
+		iDamage += wBaseDamage;
+	}//#endif	
+
+
+	switch (wElem)
+	{
+	case 1:
+	case 2:
+	case 3:
+	case 4:
+	case 5:
+	{
+		iDamage *= (100.0 - static_cast<float> (sElementalResistance[wElem - 1])) / 100.0;
+		SHORT rgsMagicEffect = 10 + gpGlobals->g.lprgBattleField[gpGlobals->wNumBattleField].rgsMagicEffect[wElem - 1];
+		iDamage *= rgsMagicEffect / 10.0;
+		break;
+	}
+
+	case 6: //毒系
+	{
+		iDamage *= (100.0 - static_cast<float>(sPoisonResistance)) / 100.0;
+		break;
+	}
+
+	case 0:
+	default:
+		break;
+	}
+	return iDamage;
+}
+
+INT CFight::PAL_CalcPhysicalAttackDamageBase(DWORD wAttackStrength, DWORD wDefense, DWORD wAttackResistance)
+/*++
+功能：    Calculate the damage value of physical attacking.
+计算物理攻击伤害值
+参数：    [IN]  wAttackStrength - attack strength of attacker.
+[IN]  wDefense - defense value of inflictor.
+[IN]  wAttackResistance - inflictor's resistance to physical attack.
+攻击者武术值，被攻击者防御值，被攻击者物抗
+返回值：    The damage value of the physical attacking.
+物理攻击伤害值
+--*/
+{
+	INT             iDamage;
+
+	iDamage = PAL_CalcBaseDamage(wAttackStrength, wDefense);
+	//wAttackResistance = min(wAttackResistance, 20);
+	if (wAttackResistance != 0)
+	{
+		//iDamage *= iDamage * 10 / wAttackResistance;
+		iDamage *= (110.0 - wAttackResistance) / 100.0;
+	}
+
+	return iDamage;
+}
+
+
+void CFight::PAL_BattleEnemyPhysical(WORD wEnemyIndex, WORD wPlayerID)
 {
 
 	int str, def, iCoverIndex, i, x, y, ex, ey, iSound, iDamage;
 
 	WORD wPlayerRole = gpGlobals->rgParty[wPlayerID].wPlayerRole;
-	
-	//auto& gConfig = gpGlobals->gConfig;
+
 
 	auto sTarget = wPlayerID;
 
@@ -4583,7 +4310,7 @@ VOID CFight::PAL_BattleEnemyPhysical(WORD wEnemyIndex, WORD wPlayerID)
 
 	iCoverIndex = -1;
 
-	auto fAutoDefend = PAL_New_GetTrueByPercentage(ggConfig->m_Function_Set[22])
+	auto fAutoDefend = PAL_New_GetTrueByPercentage(cfgAutoDefRatio)
 		|| PAL_GetManuallyDefend();
 
 
@@ -4630,7 +4357,7 @@ VOID CFight::PAL_BattleEnemyPhysical(WORD wEnemyIndex, WORD wPlayerID)
 		PAL_BattleDelay(1, 0, FALSE);
 	}
 	//#ifdef PAL_WIN95
-	if (!ggConfig->fIsWIN95 || g_Battle.rgEnemy[wEnemyIndex].e.wActionSound != 0)
+	if (!cfgIsWin95 || g_Battle.rgEnemy[wEnemyIndex].e.wActionSound != 0)
 		//#endif
 	{
 		SOUND_Play(g_Battle.rgEnemy[wEnemyIndex].e.wActionSound);
@@ -4642,15 +4369,15 @@ VOID CFight::PAL_BattleEnemyPhysical(WORD wEnemyIndex, WORD wPlayerID)
 
 	iSound = g_Battle.rgEnemy[wEnemyIndex].e.wCallSound;
 
-//#ifdef GAIN_MORE_HIDDEN_EXP
-	if(ggConfig->m_Function_Set[54])//更多的隐藏经验
+	//#ifdef GAIN_MORE_HIDDEN_EXP
+	if (cfgHiddenExp)//更多的隐藏经验
 		if (fAutoDefend == TRUE)
 		{
 			gpGlobals->Exp.rgDefenseExp[wPlayerRole].wCount += RandomLong(0, 1);
 			gpGlobals->Exp.rgDexterityExp[wPlayerRole].wCount += RandomLong(0, 1);
 			gpGlobals->Exp.rgFleeExp[wPlayerRole].wCount += RandomLong(0, 1);
 		}
-//#endif 
+	//#endif 
 
 	if (iCoverIndex != -1)
 	{
@@ -4707,7 +4434,7 @@ VOID CFight::PAL_BattleEnemyPhysical(WORD wEnemyIndex, WORD wPlayerID)
 			iDamage /= 2;
 		}
 		iDamage = std::max(iDamage, 1);
-		iDamage = std::min(iDamage,(int) gpGlobals->g.PlayerRoles.rgwHP[wPlayerRole]);
+		iDamage = std::min(iDamage, (int)gpGlobals->g.PlayerRoles.rgwHP[wPlayerRole]);
 
 		//#ifndef INVINCIBLE
 		if (!debugSwitch[fIsInvincible])
@@ -4721,7 +4448,7 @@ VOID CFight::PAL_BattleEnemyPhysical(WORD wEnemyIndex, WORD wPlayerID)
 
 	//#ifdef PAL_WIN95
 			//if (iSound != 0)
-	if (!ggConfig->fIsWIN95 || iSound != 0)
+	if (!cfgIsWin95 || iSound != 0)
 		//#endif
 	{
 		SOUND_Play(iSound);
@@ -4793,40 +4520,38 @@ VOID CFight::PAL_BattleEnemyPhysical(WORD wEnemyIndex, WORD wPlayerID)
 
 }
 
-INT CFight::PAL_GetManuallyDefend()
+const INT CFight::PAL_GetManuallyDefend()const
 {
 	//功能：返回手动防御，成功返回 TRUE ，不成功返回0
-	auto k = ggConfig->m_Function_Set[22] == 0
-		&& (SDL_GetTicks_New() - lastKeyDownTime) < 200;
+	auto k = (cfgAutoDefRatio == 0
+		&& (SDL_GetTicks_New() - lastKeyDownTime) < 200);
 	return k;
 }
 
 void CFight::PAL_AutoBattle()
 {
 	//战斗自动进行
-	PAL_BattlePlayerCheckReady();
 	// 当角色状态时可以接受命令时
 	for (int i = 0; i <= gpGlobals->wMaxPartyMemberIndex; i++)
 	{
-		if (g_Battle.rgPlayer[i].state == kFighterCom)
+		if (g_Battle.rgPlayer[i].state == FIGHTERSTATE::kFighterCom)
 		{
-			PAL_BattleUIPlayerReady(i);
 			break;
 		}
 	}
 
-	if (g_Battle.UI.state != kBattleUIWait)
+	if (g_Battle.UI.state != BATTLEUISTATE::kBattleUIWait)
 	{
 		auto w = PAL_BattleUIPickAutoMagic(gpGlobals->rgParty[g_Battle.UI.wCurPlayerIndex].wPlayerRole, 9999);
 
 		if (w == 0)
 		{
-			g_Battle.UI.wActionType = kBattleActionAttack;
+			g_Battle.UI.wActionType = BATTLEACTIONTYPE::kBattleActionAttack;
 			g_Battle.UI.wSelectedIndex = PAL_BattleSelectAutoTarget();
 		}
 		else
 		{
-			g_Battle.UI.wActionType = kBattleActionMagic;
+			g_Battle.UI.wActionType = BATTLEACTIONTYPE::kBattleActionMagic;
 			g_Battle.UI.wObjectID = w;
 
 			if (gpGlobals->g.rgObject[w].magic.wFlags & kMagicFlagApplyToAll)
@@ -4843,6 +4568,119 @@ void CFight::PAL_AutoBattle()
 	}
 }
 
+void CFight::PAL_BattleProcessPlayerAction(int iPlayerRole)
+{
+	//如果玩家充能未完成，跳过
+
+	auto i = iPlayerRole;
+	
+	auto wPlayerRole = gpGlobals->rgParty[i].wPlayerRole;
+
+	// Update statuses
+	for (int j = 0; j < kStatusAll; j++)
+	{
+		if (gpGlobals->rgPlayerStatus[wPlayerRole][j] > 0)
+		{
+			gpGlobals->rgPlayerStatus[wPlayerRole][j]--;
+		}
+	}
+	//主动防御加强
+	if (cfgDefBoostActive > 0)
+		//每一轮减少
+		if (g_Battle.rgPlayer[i].fDefenAction)
+			g_Battle.rgPlayer[i].fDefenAction--;
+	if (cfgDefBoostActive < 0)
+		cfgDefBoostActive = 0;
+
+	//
+	// Run poison scripts
+	// 执行中毒脚本前、后都需要排序 我方
+	PAL_New_SortPoisonsForPlayerByLevel(wPlayerRole);
+	for (int j = 0; j < MAX_POISONS; j++)
+	{
+		if (gpGlobals->rgPoisonStatus[j][i].wPoisonID != 0
+			&& gpGlobals->g.PlayerRoles.rgwHP[wPlayerRole] != 0
+			)
+		{
+			if (cfgPoisonUp) //增加毒的烈度
+			{
+				auto dwPrevHP = gpGlobals->g.PlayerRoles.rgwHP[wPlayerRole];
+				auto dwPrevMP = gpGlobals->g.PlayerRoles.rgwMP[wPlayerRole];
+
+				gpGlobals->rgPoisonStatus[j][i].wPoisonScript =
+					PAL_RunTriggerScript(gpGlobals->rgPoisonStatus[j][i].wPoisonScript, wPlayerRole);
+
+				auto iExtraPoisonDamage = dwPrevHP - gpGlobals->g.PlayerRoles.rgwHP[wPlayerRole];
+				auto iExtraPoisonMPDamage = dwPrevMP - gpGlobals->g.PlayerRoles.rgwMP[wPlayerRole];
+
+				iExtraPoisonDamage = std::max(iExtraPoisonDamage, 0);
+				iExtraPoisonMPDamage = std::max(iExtraPoisonMPDamage, 0);
+				iExtraPoisonDamage *= gpGlobals->rgPoisonStatus[j][i].wPoisonIntensity;
+				iExtraPoisonMPDamage *= gpGlobals->rgPoisonStatus[j][i].wPoisonIntensity;
+				iExtraPoisonDamage = std::min(iExtraPoisonDamage, MAX_DAMAGE);
+				iExtraPoisonMPDamage = std::min(iExtraPoisonMPDamage, MAX_DAMAGE);
+				PAL_IncreaseHPMP(wPlayerRole, -(SHORT)iExtraPoisonDamage, -(SHORT)iExtraPoisonMPDamage);
+			}
+			else
+				gpGlobals->rgPoisonStatus[j][i].wPoisonScript =
+				PAL_RunTriggerScript(gpGlobals->rgPoisonStatus[j][i].wPoisonScript, wPlayerRole);
+		}
+	}
+	PAL_New_SortPoisonsForPlayerByLevel(wPlayerRole);
+
+	//如果死亡了并且不是傀儡虫控制状态，则移除所有的状态
+	if (gpGlobals->g.PlayerRoles.rgwHP[wPlayerRole] == 0
+		&& gpGlobals->rgPlayerStatus[wPlayerRole][kStatusPuppet] == 0)
+	{
+		PAL_New_RemovePlayerAllStatus(wPlayerRole);
+	}
+}
+
+void CFight::PAL_BattleProcessEnemyAction(int enemy)
+{
+	auto i = enemy;
+	// Update statuses
+	for (int j = 0; j < kStatusAll; j++)
+	{
+		if (g_Battle.rgEnemy[i].rgwStatus[j] > 0)
+		{
+			g_Battle.rgEnemy[i].rgwStatus[j]--;
+		}
+	}
+	//
+	// Run poison scripts
+	// 执行中毒脚本前、后都需要排序  敌方
+	PAL_New_SortPoisonsForEnemyByLevel(i);
+	for (int j = 0; j < MAX_POISONS; j++)
+	{
+		WORD wPoisonID = g_Battle.rgEnemy[i].rgPoisons[j].wPoisonID;
+		if (wPoisonID != 0)
+		{
+			if (cfgPoisonUp)
+			{
+				auto dwPrevHP = g_Battle.rgEnemy[i].dwActualHealth;
+				g_Battle.rgEnemy[i].rgPoisons[j].wPoisonScript =
+					PAL_RunTriggerScript(g_Battle.rgEnemy[i].rgPoisons[j].wPoisonScript, (WORD)i);
+				auto iExtraPoisonDamage = dwPrevHP - g_Battle.rgEnemy[i].dwActualHealth;
+				WORD wPoisonIntensity = g_Battle.rgEnemy[i].rgPoisons[j].wPoisonIntensity;
+				if (iExtraPoisonDamage > 0 && wPoisonIntensity > 0)
+				{
+					iExtraPoisonDamage *= wPoisonIntensity;
+					iExtraPoisonDamage = std::min((int)iExtraPoisonDamage, (int)g_Battle.rgEnemy[i].dwActualHealth);
+					g_Battle.rgEnemy[i].dwActualHealth -= iExtraPoisonDamage;
+				}
+			}
+			else
+				//#else
+				g_Battle.rgEnemy[i].rgPoisons[j].wPoisonScript =
+				PAL_RunTriggerScript(g_Battle.rgEnemy[i].rgPoisons[j].wPoisonScript, (WORD)i);
+			//#endif
+		}
+	}
+	PAL_New_SortPoisonsForEnemyByLevel(i);
+
+}
+
 void CFight::PAL_BattleDrawPlayerinformationBar()
 {
 	//// 画玩家信息栏
@@ -4851,8 +4689,7 @@ void CFight::PAL_BattleDrawPlayerinformationBar()
 	for (int i = 0; i <= gpGlobals->wMaxPartyMemberIndex; i++)
 	{
 		auto wPlayerRole = gpGlobals->rgParty[i].wPlayerRole;
-		auto w = (WORD)(g_Battle.rgPlayer[i].flTimeMeter);
-
+		int w = 0;
 		auto j = TIMEMETER_COLOR_DEFAULT;
 
 		if (gpGlobals->rgPlayerStatus[wPlayerRole][kStatusSleep] != 0 ||
@@ -4892,10 +4729,10 @@ void CFight::PAL_BattleDrawIconAndSelect()
 		BATTLEUIACTION    action;
 	} rgItems[] =
 	{// 4个战斗界面中的菜单
-		{SPRITENUM_BATTLEICON_ATTACK, PAL_XY(27, 140), kBattleUIActionAttack},
-		{SPRITENUM_BATTLEICON_MAGIC, PAL_XY(0, 155), kBattleUIActionMagic},
-		{SPRITENUM_BATTLEICON_COOPMAGIC, PAL_XY(54, 155), kBattleUIActionCoopMagic},
-		{SPRITENUM_BATTLEICON_MISCMENU, PAL_XY(27, 170), kBattleUIActionMisc}
+		{SPRITENUM_BATTLEICON_ATTACK, PAL_XY(27, 140), BATTLEUIACTION::kBattleUIActionAttack},
+		{SPRITENUM_BATTLEICON_MAGIC, PAL_XY(0, 155), BATTLEUIACTION::kBattleUIActionMagic},
+		{SPRITENUM_BATTLEICON_COOPMAGIC, PAL_XY(54, 155), BATTLEUIACTION::kBattleUIActionCoopMagic},
+		{SPRITENUM_BATTLEICON_MISCMENU, PAL_XY(27, 170), BATTLEUIACTION::kBattleUIActionMisc}
 	};
 	std::vector<PAL_Rect> itemRects;
 	for (int n = 0; n < 4; n++)
@@ -4918,7 +4755,7 @@ void CFight::PAL_BattleDrawIconAndSelect()
 			if (g_Battle.UI.wSelectedAction == item - 1)
 			{
 				//已经选择 模拟空格键
-				SetKeyPress( kKeySearch);
+				SetKeyPress(kKeySearch);
 			}
 			else {
 				g_Battle.UI.wSelectedAction = item - 1;
@@ -4926,30 +4763,26 @@ void CFight::PAL_BattleDrawIconAndSelect()
 		}
 	}
 	// 用上下左右键来选择4个菜单
-	else if (g_Battle.UI.MenuState == kBattleMenuMain)
+	else if (g_Battle.UI.MenuState == BATTLEMENUSTATE::kBattleMenuMain)
 	{
 		if (getDirEction() == kDirNorth)
-		//if(getKeyPress()&kKeyUp)
 		{
 			g_Battle.UI.wSelectedAction = 0;
 		}
 		else if (getDirEction() == kDirSouth)
-		//else if(getKeyPress() & kKeyDown)
 		{
 			g_Battle.UI.wSelectedAction = 3;
 		}
 		else if (getDirEction() == kDirWest)
-		//else if(getKeyPress() & kKeyLeft)
 		{
-			if (PAL_BattleUIIsActionValid(kBattleUIActionMagic))
+			if (PAL_BattleUIIsActionValid(BATTLEUIACTION::kBattleUIActionMagic))
 			{
 				g_Battle.UI.wSelectedAction = 1;
 			}
 		}
 		else if (getDirEction() == kDirEast)
-		//else if(getKeyPress()& kKeyRight)
 		{
-			if (PAL_BattleUIIsActionValid(kBattleUIActionCoopMagic))
+			if (PAL_BattleUIIsActionValid(BATTLEUIACTION::kBattleUIActionCoopMagic))
 			{
 				g_Battle.UI.wSelectedAction = 2;
 			}
@@ -4988,49 +4821,49 @@ void CFight::PAL_BattleUISelectMove()
 
 	switch (g_Battle.UI.MenuState)
 	{
-	case kBattleMenuMain:
+	case BATTLEMENUSTATE::kBattleMenuMain:
 	{
 		PAL_BattleMenuMain();
 		break;
 	}
 
-	case kBattleMenuMagicSelect:
+	case BATTLEMENUSTATE::kBattleMenuMagicSelect:
 	{
 		auto w = PAL_MagicSelectionMenuUpdate();
 		if (w == 0xFFFF)
 			break;
 
-		g_Battle.UI.MenuState = kBattleMenuMain;
+		g_Battle.UI.MenuState = BATTLEMENUSTATE::kBattleMenuMain;
 
 		//决定魔法目标类型
 		if (w != 0)
 		{
-			g_Battle.UI.wActionType = kBattleActionMagic;
+			g_Battle.UI.wActionType = BATTLEACTIONTYPE::kBattleActionMagic;
 			g_Battle.UI.wObjectID = w;
 
 			if (gpGlobals->g.rgObject[w].magic.wFlags & kMagicFlagUsableToEnemy)
 			{
 				if (gpGlobals->g.rgObject[w].magic.wFlags & kMagicFlagApplyToAll)
 				{
-					g_Battle.UI.state = kBattleUISelectTargetEnemyAll;
+					g_Battle.UI.state = BATTLEUISTATE::kBattleUISelectTargetEnemyAll;
 				}
 				else
 				{
 					g_Battle.UI.wSelectedIndex = g_Battle.UI.wPrevEnemyTarget;
-					g_Battle.UI.state = kBattleUISelectTargetEnemy;
+					g_Battle.UI.state = BATTLEUISTATE::kBattleUISelectTargetEnemy;
 				}
 			}
 			else
 			{
 				if (gpGlobals->g.rgObject[w].magic.wFlags & kMagicFlagApplyToAll)
 				{
-					g_Battle.UI.state = kBattleUISelectTargetPlayerAll;
+					g_Battle.UI.state = BATTLEUISTATE::kBattleUISelectTargetPlayerAll;
 				}
 				else
 				{
 					g_Battle.UI.wSelectedIndex = 0;
 
-					g_Battle.UI.state = kBattleUISelectTargetPlayer;
+					g_Battle.UI.state = BATTLEUISTATE::kBattleUISelectTargetPlayer;
 				}
 			}
 		}
@@ -5038,21 +4871,21 @@ void CFight::PAL_BattleUISelectMove()
 		break;
 	}
 
-	case kBattleMenuUseItemSelect:
+	case BATTLEMENUSTATE::kBattleMenuUseItemSelect:
 		PAL_BattleUIUseItem();
 		break;
 
-	case kBattleMenuThrowItemSelect:
+	case BATTLEMENUSTATE::kBattleMenuThrowItemSelect:
 		PAL_BattleUIThrowItem();
 		break;
 
-	case kBattleMenuMisc:
+	case BATTLEMENUSTATE::kBattleMenuMisc:
 	{
 		auto w = PAL_BattleUIMiscMenuUpdate();
 
 		if (w != 0xFFFF)
 		{
-			g_Battle.UI.MenuState = kBattleMenuMain;
+			g_Battle.UI.MenuState = BATTLEMENUSTATE::kBattleMenuMain;
 
 			switch (w)
 			{
@@ -5061,17 +4894,17 @@ void CFight::PAL_BattleUISelectMove()
 				break;
 
 			case 2: // item  物品
-				g_Battle.UI.MenuState = kBattleMenuMiscItemSubMenu;
+				g_Battle.UI.MenuState = BATTLEMENUSTATE::kBattleMenuMiscItemSubMenu;
 				g_iCurSubMenuItem = 0;
 				break;
 
 			case 3: // defend  防御
-				g_Battle.UI.wActionType = kBattleActionDefend;
+				g_Battle.UI.wActionType = BATTLEACTIONTYPE::kBattleActionDefend;
 				PAL_BattleCommitAction(FALSE);
 				break;
 
 			case 4: // flee    逃跑
-				g_Battle.UI.wActionType = kBattleActionFlee;
+				g_Battle.UI.wActionType = BATTLEACTIONTYPE::kBattleActionFlee;
 				PAL_BattleCommitAction(FALSE);
 				break;
 
@@ -5079,7 +4912,7 @@ void CFight::PAL_BattleUISelectMove()
 				PAL_PlayerStatus();
 				break;
 			case 6: // 显示数据开关
-				if (ggConfig->m_Function_Set[2]) {
+				if (cfgShowBtlData) {
 					gpGlobals->fShowDataInBattle =
 						PAL_SwitchMenu(gpGlobals->fShowDataInBattle);
 				}
@@ -5096,7 +4929,7 @@ void CFight::PAL_BattleUISelectMove()
 	}
 
 
-	case kBattleMenuMiscItemSubMenu:
+	case BATTLEMENUSTATE::kBattleMenuMiscItemSubMenu:
 	{
 #ifdef SORT_INVENTORY
 		PAL_New_SortInventory();
@@ -5105,17 +4938,17 @@ void CFight::PAL_BattleUISelectMove()
 
 		if (w != 0xFFFF)
 		{
-			g_Battle.UI.MenuState = kBattleMenuMain;
+			g_Battle.UI.MenuState = BATTLEMENUSTATE::kBattleMenuMain;
 
 			switch (w)
 			{
 			case 1: // use  // 使用（物品）
-				g_Battle.UI.MenuState = kBattleMenuUseItemSelect;
+				g_Battle.UI.MenuState = BATTLEMENUSTATE::kBattleMenuUseItemSelect;
 				PAL_ItemSelectMenuInit(kItemFlagUsable);
 				break;
 
 			case 2: // throw	// 投掷（物品）
-				g_Battle.UI.MenuState = kBattleMenuThrowItemSelect;
+				g_Battle.UI.MenuState = BATTLEMENUSTATE::kBattleMenuThrowItemSelect;
 				PAL_ItemSelectMenuInit(kItemFlagThrowable);
 				break;
 			}
@@ -5135,15 +4968,15 @@ void CFight::PAL_BattleMenuMain()
 			//选择物攻
 		case 0:
 		{
-			g_Battle.UI.wActionType = kBattleActionAttack;
+			g_Battle.UI.wActionType = BATTLEACTIONTYPE::kBattleActionAttack;
 			if (PAL_PlayerCanAttackAll(gpGlobals->rgParty[g_Battle.UI.wCurPlayerIndex].wPlayerRole))
 			{
-				g_Battle.UI.state = kBattleUISelectTargetEnemyAll;
+				g_Battle.UI.state = BATTLEUISTATE::kBattleUISelectTargetEnemyAll;
 			}
 			else
 			{
 				g_Battle.UI.wSelectedIndex = g_Battle.UI.wPrevEnemyTarget;
-				g_Battle.UI.state = kBattleUISelectTargetEnemy;
+				g_Battle.UI.state = BATTLEUISTATE::kBattleUISelectTargetEnemy;
 			}
 			break;
 		}
@@ -5154,7 +4987,7 @@ void CFight::PAL_BattleMenuMain()
 			auto wPlayerRole = gpGlobals->rgParty[
 				g_Battle.UI.wCurPlayerIndex].wPlayerRole;
 
-			g_Battle.UI.MenuState = kBattleMenuMagicSelect;
+			g_Battle.UI.MenuState = BATTLEMENUSTATE::kBattleMenuMagicSelect;
 			PAL_MagicSelectionMenuInit(wPlayerRole, TRUE, 0);
 			break;
 		}
@@ -5165,31 +4998,31 @@ void CFight::PAL_BattleMenuMain()
 			auto w = gpGlobals->rgParty[g_Battle.UI.wCurPlayerIndex].wPlayerRole;
 			w = PAL_GetPlayerCooperativeMagic(w);
 
-			g_Battle.UI.wActionType = kBattleActionCoopMagic;
+			g_Battle.UI.wActionType = BATTLEACTIONTYPE::kBattleActionCoopMagic;
 			g_Battle.UI.wObjectID = w;
 
 			if (gpGlobals->g.rgObject[w].magic.wFlags & kMagicFlagUsableToEnemy)
 			{
 				if (gpGlobals->g.rgObject[w].magic.wFlags & kMagicFlagApplyToAll)
 				{
-					g_Battle.UI.state = kBattleUISelectTargetEnemyAll;
+					g_Battle.UI.state = BATTLEUISTATE::kBattleUISelectTargetEnemyAll;
 				}
 				else
 				{
 					g_Battle.UI.wSelectedIndex = g_Battle.UI.wPrevEnemyTarget;
-					g_Battle.UI.state = kBattleUISelectTargetEnemy;
+					g_Battle.UI.state = BATTLEUISTATE::kBattleUISelectTargetEnemy;
 				}
 			}
 			else
 			{
 				if (gpGlobals->g.rgObject[w].magic.wFlags & kMagicFlagApplyToAll)
 				{
-					g_Battle.UI.state = kBattleUISelectTargetPlayerAll;
+					g_Battle.UI.state = BATTLEUISTATE::kBattleUISelectTargetPlayerAll;
 				}
 				else
 				{
 					g_Battle.UI.wSelectedIndex = 0;
-					g_Battle.UI.state = kBattleUISelectTargetPlayer;
+					g_Battle.UI.state = BATTLEUISTATE::kBattleUISelectTargetPlayer;
 				}
 			}
 			break;
@@ -5198,7 +5031,7 @@ void CFight::PAL_BattleMenuMain()
 		//选择杂项菜单
 		case 3:
 		{
-			g_Battle.UI.MenuState = kBattleMenuMisc;
+			g_Battle.UI.MenuState = BATTLEMENUSTATE::kBattleMenuMisc;
 			g_iCurMiscMenuItem = 0;
 			break;
 		}
@@ -5206,7 +5039,7 @@ void CFight::PAL_BattleMenuMain()
 	}
 	else if (GetKeyPress() & kKeyDefend)
 	{
-		g_Battle.UI.wActionType = kBattleActionDefend;
+		g_Battle.UI.wActionType = BATTLEACTIONTYPE::kBattleActionDefend;
 		PAL_BattleCommitAction(FALSE);
 	}
 	else if (GetKeyPress() & kKeyForce)
@@ -5215,7 +5048,7 @@ void CFight::PAL_BattleMenuMain()
 
 		if (w == 0)
 		{
-			g_Battle.UI.wActionType = kBattleActionAttack;
+			g_Battle.UI.wActionType = BATTLEACTIONTYPE::kBattleActionAttack;
 
 			if (PAL_PlayerCanAttackAll(gpGlobals->rgParty[g_Battle.UI.wCurPlayerIndex].wPlayerRole))
 			{
@@ -5228,7 +5061,7 @@ void CFight::PAL_BattleMenuMain()
 		}
 		else
 		{
-			g_Battle.UI.wActionType = kBattleActionMagic;
+			g_Battle.UI.wActionType = BATTLEACTIONTYPE::kBattleActionMagic;
 			g_Battle.UI.wObjectID = w;
 
 			if (gpGlobals->g.rgObject[w].magic.wFlags & kMagicFlagApplyToAll)
@@ -5245,7 +5078,7 @@ void CFight::PAL_BattleMenuMain()
 	}
 	else if (GetKeyPress() & kKeyFlee)
 	{
-		if (g_Battle.fIsBoss && ggConfig->m_Function_Set[52])
+		if (g_Battle.fIsBoss && cfgBossRetryQ)
 		{
 			//与BOSS战斗时 Q 键直接重新开始
 			if (PAL_ConfirmMenu("从战斗中退出吗？")) {
@@ -5255,17 +5088,17 @@ void CFight::PAL_BattleMenuMain()
 			}
 
 		}
-		g_Battle.UI.wActionType = kBattleActionFlee;
+		g_Battle.UI.wActionType = BATTLEACTIONTYPE::kBattleActionFlee;
 		PAL_BattleCommitAction(FALSE);
 	}
 	else if (GetKeyPress() & kKeyUseItem)
 	{
-		g_Battle.UI.MenuState = kBattleMenuUseItemSelect;
+		g_Battle.UI.MenuState = BATTLEMENUSTATE::kBattleMenuUseItemSelect;
 		PAL_ItemSelectMenuInit(kItemFlagUsable);
 	}
 	else if (GetKeyPress() & kKeyThrowItem)
 	{
-		g_Battle.UI.MenuState = kBattleMenuThrowItemSelect;
+		g_Battle.UI.MenuState = BATTLEMENUSTATE::kBattleMenuThrowItemSelect;
 		PAL_ItemSelectMenuInit(kItemFlagThrowable);
 	}
 	else if (GetKeyPress() & kKeyRepeat)
@@ -5275,8 +5108,8 @@ void CFight::PAL_BattleMenuMain()
 
 	else if (GetKeyPress() & kKeyMenu)
 	{
-		g_Battle.rgPlayer[g_Battle.UI.wCurPlayerIndex].state = kFighterWait;
-		g_Battle.UI.state = kBattleUIWait;
+		g_Battle.rgPlayer[g_Battle.UI.wCurPlayerIndex].state = FIGHTERSTATE::kFighterWait;
+		g_Battle.UI.state = BATTLEUISTATE::kBattleUIWait;
 
 		if (g_Battle.UI.wCurPlayerIndex > 0)
 		{
@@ -5285,9 +5118,9 @@ void CFight::PAL_BattleMenuMain()
 			//恢复到之前的角色
 			do
 			{
-				g_Battle.rgPlayer[--g_Battle.UI.wCurPlayerIndex].state = kFighterWait;
+				g_Battle.rgPlayer[--g_Battle.UI.wCurPlayerIndex].state = FIGHTERSTATE::kFighterWait;
 
-				if (g_Battle.rgPlayer[g_Battle.UI.wCurPlayerIndex].action.ActionType == kBattleActionThrowItem)
+				if (g_Battle.rgPlayer[g_Battle.UI.wCurPlayerIndex].action.ActionType == BATTLEACTIONTYPE::kBattleActionThrowItem)
 				{
 					for (int i = 0; i < MAX_INVENTORY; i++)
 					{
@@ -5299,7 +5132,7 @@ void CFight::PAL_BattleMenuMain()
 						}
 					}
 				}
-				else if (g_Battle.rgPlayer[g_Battle.UI.wCurPlayerIndex].action.ActionType == kBattleActionUseItem)
+				else if (g_Battle.rgPlayer[g_Battle.UI.wCurPlayerIndex].action.ActionType == BATTLEACTIONTYPE::kBattleActionUseItem)
 				{
 					if (gpGlobals->g.rgObject[g_Battle.rgPlayer[g_Battle.UI.wCurPlayerIndex].action.wActionID].item.wFlags & kItemFlagConsuming)
 					{
@@ -5323,6 +5156,25 @@ void CFight::PAL_BattleMenuMain()
 	}
 }
 
+VOID CFight::PAL_BattleUIPlayerReady(WORD wPlayerIndex)
+/*++
+Purpose:
+
+Start the action selection menu of the specified player.
+开始选定角色的动作选择菜单。
+Parameters:    [IN]  wPlayerIndex - the player index.
+角色的序号
+Return value:    None.
+--*/
+{
+	//When the real-time battle screen is in the status of a select action
+	g_Battle.UI.wCurPlayerIndex = wPlayerIndex;
+	g_Battle.UI.state = BATTLEUISTATE::kBattleUISelectMove;
+	g_Battle.UI.wSelectedAction = 0;
+	g_Battle.UI.MenuState = BATTLEMENUSTATE::kBattleMenuMain;
+
+}
+
 void CFight::PAL_BattleUISelectTargetEnemy()
 
 {
@@ -5340,15 +5192,15 @@ void CFight::PAL_BattleUISelectTargetEnemy()
 
 	if (x == -1)
 	{
-		g_Battle.UI.state = kBattleUISelectMove;
+		g_Battle.UI.state = BATTLEUISTATE::kBattleUISelectMove;
 		return;
 	}
 
-	if (g_Battle.UI.wActionType == kBattleActionCoopMagic)
+	if (g_Battle.UI.wActionType == BATTLEACTIONTYPE::kBattleActionCoopMagic)
 	{
-		if (!PAL_BattleUIIsActionValid(kBattleUIActionCoopMagic))
+		if (!PAL_BattleUIIsActionValid(BATTLEUIACTION::kBattleUIActionCoopMagic))
 		{
-			g_Battle.UI.state = kBattleUISelectMove;
+			g_Battle.UI.state = BATTLEUISTATE::kBattleUISelectMove;
 			return;
 		}
 	}
@@ -5394,7 +5246,7 @@ void CFight::PAL_BattleUISelectTargetEnemy()
 	x = g_Battle.wMaxEnemyIndex;
 
 	std::vector<PAL_Rect> itemRects;
-	for(int i = 0; i <= x; i++)
+	for (int i = 0; i <= x; i++)
 	{
 		if (g_Battle.rgEnemy[i].wObjectID == 0)
 			continue;
@@ -5424,7 +5276,7 @@ void CFight::PAL_BattleUISelectTargetEnemy()
 
 	if (GetKeyPress() & kKeyMenu)
 	{
-		g_Battle.UI.state = kBattleUISelectMove;
+		g_Battle.UI.state = BATTLEUISTATE::kBattleUISelectMove;
 	}
 	else if (GetKeyPress() & kKeySearch)
 	{
@@ -5509,7 +5361,7 @@ void CFight::PAL_BattleUISelectTargetPlayer()
 	}
 	if (GetKeyPress() & kKeyMenu)
 	{
-		g_Battle.UI.state = kBattleUISelectMove;
+		g_Battle.UI.state = BATTLEUISTATE::kBattleUISelectMove;
 	}
 	else if (GetKeyPress() & kKeySearch)
 	{
@@ -5551,7 +5403,7 @@ Return value:    The selected item number. 0 if cancelled, 0xFFFF if not confirm
 {
 	int iMenuItemMaxIndex = 4;
 
-	if (ggConfig->m_Function_Set[2])////#ifdef SHOW_DATA_IN_BATTLE
+	if (cfgShowBtlData)////#ifdef cfgShowBtlData
 		iMenuItemMaxIndex++;
 
 #ifdef SHOW_ENEMY_STATUS
@@ -5688,7 +5540,7 @@ Return value:    The selected item number. 0 if cancelled, 0xFFFF if not confirm
 	return 0xFFFF;
 }
 
-std::vector<PAL_Rect> CFight::PAL_BattleUIDrawMiscMenu(WORD wCurrentItem, BOOL fConfirmed)
+const std::vector<PAL_Rect> CFight::PAL_BattleUIDrawMiscMenu(WORD wCurrentItem, BOOL fConfirmed)
 /*++
 Purpose:    Draw the misc menu.
 画出杂项菜单。
@@ -5713,7 +5565,7 @@ Return value:    None.
 		rgMenuItem[i - 1] = { i++, BATTLEUI_LABEL_DEFEND, TRUE, PAL_XY(x, y + (i * 18)) };	//防御
 		rgMenuItem[i - 1] = { i++, BATTLEUI_LABEL_FLEE, TRUE, PAL_XY(x, y + (i * 18)) };	//逃跑
 		rgMenuItem[i - 1] = { i++, BATTLEUI_LABEL_STATUS, TRUE, PAL_XY(x, y + (i * 18)) };	//状态
-		if (ggConfig->m_Function_Set[2])
+		if (cfgShowBtlData)
 			rgMenuItem[i - 1] = { i++, BATTLEUI_LABEL_DATA , TRUE, PAL_XY(x, y + (i * 18)) };	//数据
 		rgMenuItem[i - 1] = { i++, BATTLEUI_LABEL_ENEMY_STATUS, TRUE, PAL_XY(x, y + (i * 18)) };//敌方状态
 	};
@@ -5741,5 +5593,321 @@ Return value:    None.
 		rects.push_back(PAL_Rect(rgMenuItem[i].pos, PalSize(64, 16)));
 	}
 	return rects;
+}
+
+/*
+* 即时战斗充能规则，
+* 以第一个我方成员基础速度为基础 xb = (x0 +100)
+* 实时速度除以基础速度为相对速度倒数并取 yn = （pow((xn++100)/xb,0.3)
+* 充能条值为100，每个周期前进 yn ,
+* 每个周期从0 开始，如多动，第二个周期起，充能条基础值从70开始
+* 战斗动作周期期间不对其他对象充能
+* 战斗中复活，充能周期从50开始
+*/
+const float  CFight::PAL_GetTimeChargingSpeed(int wDexterity)const
+{
+	//Calculate the time charging speed.
+	float  x = PAL_GetPlayerDexterity(0) + 100.0;
+	float fly = pow(wDexterity + 100.0 / x, 0.3);
+	return fly;
+}
+
+const INT CFight::PAL_New_GetHealthyPlayerNum(VOID) const
+{
+	INT i, num;
+	WORD wPlayerRole;
+	for (i = 0, num = 0; i <= gpGlobals->wMaxPartyMemberIndex; i++)
+	{
+		wPlayerRole = gpGlobals->rgParty[i].wPlayerRole;
+		if (gpGlobals->g.PlayerRoles.rgwHP[wPlayerRole] && PAL_New_IfPlayerCanMove(wPlayerRole))
+		{
+			num++;
+		}
+	}
+	return num;
+}
+
+const INT CFight::PAL_CalcBaseDamage(DWORD wAttackStrength, DWORD wDefense) const
+/*++
+功能：    Calculate the base damage value of attacking.
+计算基础伤害值
+参数：    [IN]  wAttackStrength - attack strength of attacker.
+[IN]  wDefense - defense value of inflictor.
+攻击者武术值，被攻击者防御值
+返回值：   The base damage value of the attacking.
+基础伤害值
+--*/
+{
+	INT            iDamage;
+
+	//
+	// Formula courtesy of palxex and shenyanduxing
+	//
+	if (cfgDmgFormula) {// #ifdef cfgDmgFormula
+		if (wAttackStrength > 2 * wDefense)
+		{
+			iDamage = wAttackStrength * 1.5 - wDefense * 0.5;
+		}
+		else if (wAttackStrength > wDefense)
+		{
+			iDamage = wAttackStrength * 2 - wDefense * 1.5;
+		}
+		else if (wAttackStrength > wDefense * 0.5)
+		{
+			iDamage = wAttackStrength - wDefense * 0.5;
+		}
+		else
+		{
+			iDamage = 0;
+		}
+	}
+	else //#else
+	{
+		if (wAttackStrength > wDefense)
+		{
+			iDamage = (INT)(wAttackStrength * 2 - wDefense * 1.6 + 0.5);
+		}
+		else if (wAttackStrength > wDefense * 0.6)
+		{
+			iDamage = (INT)(wAttackStrength - wDefense * 0.6 + 0.5);
+		}
+		else
+		{
+			iDamage = 0;
+		}
+	}//#endif
+
+	return iDamage;
+}
+
+const DWORD CFight::PAL_GetPlayerActualDexterity(const int i) const
+{
+	auto wPlayerRole = gpGlobals->rgParty[i].wPlayerRole;
+	DWORD wDexterity = PAL_GetPlayerDexterity(wPlayerRole);
+	if (gpGlobals->rgPlayerStatus[wPlayerRole][kStatusHaste])
+	{
+		wDexterity *= 6;
+	}
+
+	switch (g_Battle.rgPlayer[i].action.ActionType)
+	{
+	case BATTLEACTIONTYPE::kBattleActionThrowItem://新增，对投掷物品加速
+		//投掷物品加速 原无
+		wDexterity *= 2;
+		break;
+
+	case BATTLEACTIONTYPE::kBattleActionCoopMagic:
+		//合体魔法加速 原 10
+		wDexterity *= 100;
+		break;
+
+	case BATTLEACTIONTYPE::kBattleActionDefend:
+		//主动防御加速 原 5
+		wDexterity *= 50;
+		break;
+
+	case BATTLEACTIONTYPE::kBattleActionMagic:
+		if ((gpGlobals->g.rgObject[g_Battle.rgPlayer[i].action.wActionID].magic.wFlags &
+			kMagicFlagUsableToEnemy) == 0)
+		{
+			//对己方释放的魔法加速 原 3
+			wDexterity *= 8;
+		}
+		break;
+
+	case BATTLEACTIONTYPE::kBattleActionFlee:
+		//逃跑加速 原 0.5
+		wDexterity >>= 1;
+		break;
+
+	case BATTLEACTIONTYPE::kBattleActionUseItem:
+		//使用物品加速 原 3
+		wDexterity *= 15;
+		break;
+
+	default:
+		break;
+	}
+
+	if (PAL_IsPlayerDying(wPlayerRole))
+	{
+		//濒死状态降低速度 原 0.5
+		wDexterity *= 0.7;
+	}
+	return wDexterity;
+}
+
+/*
+ *Charge per cycle
+*/
+void CFight::PAL_BattleAddTimeMeter()
+{
+	for (int i = 0; i <= gpGlobals->wMaxPartyMemberIndex; i++)
+	{
+		g_Battle.rgPlayer[i].flTimeMeter += g_Battle.rgPlayer[i].flTimeChargingSpeed;
+	}
+	for (int i = 0; i <= g_Battle.wMaxEnemyIndex; i++)
+	{
+		g_Battle.rgEnemy[i].flTimeMeter += g_Battle.rgEnemy[i].flTimeChargingSpeed;
+	}
+}
+
+void CFight::PAL_BattleClearTimeMeter()
+{
+	for (int i = 0; i < MAX_PLAYERS_IN_PARTY; i++)
+	{
+		g_Battle.rgPlayer[i].flTimeMeter = 0;
+	}
+	for (int i = 0; i < MAX_ENEMIES_IN_TEAM; i++)
+	{
+		g_Battle.rgEnemy[i].flTimeMeter = 0;
+	}
+}
+
+//显示战斗进度条
+void CFight::PAL_ShowProgressBar()
+{
+	//
+	if (spriteTexture.isEmpty())
+		spriteTexture.creat(250, 60, textType::rgba32);
+	spriteTexture.fill(getTransColor());
+	//
+	if (g_Battle.spriteList.empty())
+		PAL_MakeProgressBar(g_Battle.spriteList);
+	//画中线
+	SDL_Color color = { 125, 125, 125, 255 };
+	SDL_Rect drect = { 0,29,250,2 };
+	RenderBlendCopy(spriteTexture, spriteTexture, 255, RenderMode::rmMode2, &color, &drect);
+	//画敌方
+	for (int i = 0; i <= g_Battle.wMaxEnemyIndex; i++)
+	{
+		int j = i + MAX_PLAYERS_IN_PARTY;
+		if (g_Battle.rgEnemy[i].dwActualHealth == 0)
+			continue;
+		SDL_Rect  drect = { g_Battle.rgEnemy[i].flTimeMeter * 2 + 12,3,25,25 };
+
+		if (s_iFrame)
+		{
+			//加亮
+			RenderBlendCopy(spriteTexture, g_Battle.spriteList[j], 255, RenderMode::rmMode8, 0, &drect);
+		}
+		else
+		{
+			RenderBlendCopy(spriteTexture, g_Battle.spriteList[j], 255, RenderMode::rmMode1, 0, &drect);
+		}
+	}
+	//画我方
+	for (int i = 0; i <= gpGlobals->wMaxPartyMemberIndex; i++)
+	{
+		WORD w = gpGlobals->rgParty[i].wPlayerRole;
+		SDL_Rect  drect = { g_Battle.rgPlayer[i].flTimeMeter * 2 + 12,33,25,25 };
+		SDL_Color color{};
+		if (gpGlobals->g.PlayerRoles.rgwHP[w])
+		{
+			color = { 255,255,255,255 };
+		}
+		else
+		{
+			//死亡
+			color = { 125,125,125,255 };
+		}
+		if (s_iFrame)
+		{
+			//加亮
+			RenderBlendCopy(spriteTexture, g_Battle.spriteList[i], 255, RenderMode::rmMode8, &color, &drect);
+		}
+		else
+		{
+			RenderBlendCopy(spriteTexture, g_Battle.spriteList[i], 255, RenderMode::rmMode1, &color, &drect);
+		}
+	}
+	drect = { 560,0,80,30 };
+	//最终显示
+	RenderBlendCopy(gpTextureReal, spriteTexture, 255, RenderMode::rmMode3, 0, &drect);
+}
+
+//生成角色的缩微列表
+void CFight::PAL_MakeProgressBar(std::vector<sprite>& spriteList)const
+{
+	auto makeOne = [&](int i, LPCBITMAPRLE IMBR)->void {
+		if (IMBR)
+		{
+			int wigth = PAL_RLEGetWidth(IMBR);
+			int height = PAL_RLEGetHeight(IMBR);
+			SDL_Surface* surface = SDL_CreateRGBSurface(0, wigth, height, 8, 0, 0, 0, 0);
+			SDL_SetSurfacePalette(surface, gpPalette);
+			SDL_FillRect(surface, nullptr, 255);
+			PAL_RLEBlitToSurface(IMBR, surface, PAL_XY(0, 0), 0, 0);
+			PalTexture s = PalTexture(surface);
+			SDL_FreeSurface(surface);
+			sprite t = PalTexture(32, 32);
+			RenderBlendCopy(t, s);
+			spriteList[i] = std::move(t);
+		}
+		else
+		{
+			sprite t = PalTexture(1, 1);
+			spriteList[i] = std::move(t);
+		}
+		};
+
+	//将数组各项清空
+	spriteList = std::vector<sprite>(MAX_PLAYERS_IN_PARTY + MAX_ENEMIES_IN_TEAM);
+
+	for (int i = 0; i <= gpGlobals->wMaxPartyMemberIndex; i++)
+	{
+		auto IBMR = PAL_SpriteGetFrame(g_Battle.rgPlayer[i].lpSprite, 0);
+		makeOne(i, IBMR);
+	}
+	for (int i = 0; i <= g_Battle.wMaxEnemyIndex; i++)
+	{
+		auto IBMR = PAL_SpriteGetFrame(g_Battle.rgEnemy[i].lpSprite, 0);
+		makeOne(i + MAX_PLAYERS_IN_PARTY, IBMR);
+	}
+
+}
+
+/*
+ *returns the number to which the attack is to be carried out next.
+ * Return 0-4 player 5-9 enemy, -1 no, -2 All combat actions are executed
+ */
+const int CFight::PAL_BattleGetNextDoing()const
+{
+	int item{ -1 };
+	FLOAT f{};
+	for (int i = 0; i <= gpGlobals->wMaxPartyMemberIndex; i++)
+	{
+		WORD w = gpGlobals->rgParty[i].wPlayerRole;
+		if (gpGlobals->g.PlayerRoles.rgwHP[w] == 0 && gpGlobals->rgPlayerStatus[w][kStatusPuppet] == 0)
+			continue;
+		//if (!PAL_New_IfPlayerCanMove(w) )
+			//continue;
+
+		if (f < g_Battle.rgPlayer[i].flTimeMeter
+			&& g_Battle.rgPlayer[i].state == FIGHTERSTATE::kFighterAct
+			)// doing the actual move
+		{
+			item = i;
+			f = g_Battle.rgPlayer[i].flTimeMeter;
+		}
+	}
+	for (int i = 0; i <= g_Battle.wMaxEnemyIndex; i++)
+	{
+		if (!g_Battle.rgEnemy[i].dwActualHealth)
+			continue;
+		int j = i + MAX_PLAYERS_IN_PARTY;
+		if (f < g_Battle.rgEnemy[i].flTimeMeter)
+		{
+			item = j;
+			f = g_Battle.rgEnemy[i].flTimeMeter;
+		}
+	}
+	if (item < 0)//没有可以执行的
+		return -2;
+	//classic
+	if (cfgRealtimeBtl)
+		if (f < 100.0)
+			return -1;
+	return item;
 }
 

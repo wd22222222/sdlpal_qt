@@ -57,13 +57,16 @@ CPalBase::CPalBase()
 
 CPalBase::~CPalBase()
 {
-	if (gpGlobals)
-		delete gpGlobals;
-	gpGlobals = nullptr;
+	gpGlobals.release();
+	//if (gpGlobals)
+		//delete gpGlobals;
+	//gpGlobals = nullptr;
 }
 
 PalErr CPalBase::InitPalBase()
 {
+	if(!p_DataCopy)
+	{ 
 	char buf[1200];
 	std::string s;
 #ifdef _WIN32
@@ -88,32 +91,32 @@ PalErr CPalBase::InitPalBase()
 		return 1;
 	}
 	PalDir = s;
+	}
 	//以下装入游戏数据
 	if (!gpGlobals)
 	{
-		gpGlobals = new CPalData(PalDir,p_DataCopy);
-		if (!gpGlobals )
-			return 1;
-		if (gpGlobals->isErr)
+		if (p_DataCopy)
 		{
-			delete gpGlobals;
-			gpGlobals = nullptr;
-			return 1;
+			gpGlobals = std::make_unique<CPalData>(*p_DataCopy);
+		}
+		else
+		{
+			gpGlobals = std::make_unique<CPalData>(PalDir, p_DataCopy);
+			if (!gpGlobals)
+				return 1;
+			if (gpGlobals->isErr)
+			{
+				gpGlobals.release();
+				return 1;
+			}
 		}
 	}
-	
-	ggConfig = gpGlobals->gConfig;
 	return 0;//成功
 }
 
 VOID CPalBase::destroyPalBase()
 {
-	if (!CheckHeapIntegrity())
-		delete gpGlobals;
-	else
-		;
-	gpGlobals = nullptr;
-	//gConfig = nullptr;
+	gpGlobals.release();
 }
 
 BOOL CPalBase::isCorrectDir(const std::string & dir)
