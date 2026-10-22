@@ -1,5 +1,6 @@
 ﻿
 
+#include "../main/cpaldata.h"
 #include "cgetpaldata.h"
 #include "cListScriptCall.h"
 #include "CListScriptEntry.h"
@@ -73,7 +74,7 @@ enum tagSelectTree
     WM_EDIT_DIR,
     WM_SET_TREE,
     WM_ARCHIVES,
-    WM_ARCHIVES_END = WM_ARCHIVES + MAXSAVEFILES + 1,//maxSaveFiles = 30
+    WM_ARCHIVES_END = WM_ARCHIVES + MAXSAVEFILES + 1,
     WM_RUN_TEST,//测试运行
     WM_RUN,//运行
     WM_BACKUP,//备份
@@ -173,7 +174,7 @@ LPCSTR szsm[] =
     "天罡战气后，投掷偷武器伤害增加",
     "使用梦蛇后，各项属性经验增加",
     "自动防御比率，0 为手动防御",
-    "BATTLE_FRAME_TIME 战时每帧毫秒数 40",
+    "cfgBtlFrameMs 战时每帧毫秒数 40",
     "非战时每帧毫秒数 100",
     "= 1 怪物混乱攻击同伴, = 2 怪物混乱无同伴攻击我方",
     "怪物分裂体力减半",
@@ -201,14 +202,15 @@ LPCSTR szsm[] =
     "音乐缓存区大小",
     "字体加粗，0 - 4",
     "使用粗体字， 1 是",//46
-    "最大存档文件数5-30",
+    "最大存档文件数5-50",
     "加速或减速 -80%--+500%。" ,
     "系统字符集，0自动，1 GB2312，2 BIG5",//40-49
-    "是否采用即时对战模式",
+    "是否采用即时对战模式",//50
     "亮度增强",
     "与BOSS战斗时 Q 键直接重新开始",//52
     "自动存档",
     "更多的隐藏经验",
+	"显示鼠标盘",
 };
 
 
@@ -244,11 +246,11 @@ void MainWindow::Edit_Game_Seting(int work)
     w_ColData[1].f_chuck = [&](QString  into,int row)->int
     {
         int t = into.toInt();
-        if (t > m_Pal->pal->ggConfig->configRange[row].max || t < m_Pal->pal->ggConfig->configRange[row].min)
+        if (t > CConfig::configRange[row].max || t < CConfig::configRange[row].min)
         {
             CPalEvent::printMsg("输入校验失败 最大 %d 最小 %d",
-                m_Pal->pal->ggConfig->configRange[row].max,
-                m_Pal->pal->ggConfig->configRange[row].min);
+                CConfig::configRange[row].max,
+                CConfig::configRange[row].min);
             return 0;
         }
         return 1;
@@ -262,7 +264,7 @@ void MainWindow::Edit_Game_Seting(int work)
     {
         s_RowData[n].ColVarList.resize(totalCol);
         s_RowData[n].ColVarList[0] = n + 1;
-        s_RowData[n].ColVarList[1] = m_Pal->pal->ggConfig->m_Function_Set[n];
+        s_RowData[n].ColVarList[1] = CConfig::m_Function_Set[n];
         s_RowData[n].ColVarList[2] = szsm[n];
     }
     //m_Grid->SetDataClass(rowSize, totalCol, s_RowData);
@@ -357,10 +359,10 @@ VOID MainWindow::Edit_EventObject(int work)
 void MainWindow::Edit_FontLibraryPath(int work)
 {
     //修改字库目录 
-    auto a = FontFinder(QString( m_Pal->pal->ggConfig->m_FontName.c_str()), this);
+    auto a = FontFinder(QString(CConfig::m_FontName.c_str()), this);
     if (a.exec())
     {
-        m_Pal->pal->ggConfig->m_FontName = a.selectedFontFile.toStdString();
+        CConfig::m_FontName = a.selectedFontFile.toStdString();
         //确认,数据更新
         haveModified = 1;
         //存缺省数据
@@ -494,13 +496,12 @@ void MainWindow::Edit_Explain(int swtch)
         s_RowData[n].ColVarList[0] = n;
         s_RowData[n].ColVarList[1] = n;
         std::string pDesc = m_Pal->pal->PAL_GetObjectDesc(
-            m_Pal->pal->gpGlobals->lpObjectDesc, n).c_str();
+            m_Pal->pal->gpGlobals->rgObjectDesc, n).c_str();
         s_RowData[n].ColVarList[2] = pDesc.empty() ? "  " : pDesc;
     }
     m_Grid->set_t_Data(s_Data);
     //不允许添加删除行
     m_Grid->m_popMenuFlags = 0b01011;
-
 }
 
 void MainWindow::Edit_ScriptEntry(int swtch)
@@ -533,7 +534,7 @@ void MainWindow::Edit_ScriptEntry(int swtch)
     w_ColData[8].GetData("说明", 900, 8, ctrl_Null, tSTR);//
 
     //标记脚本，更改字段pMark
-    m_Pal->PAL_MarkScriptAll();
+    m_Pal->PAL_MarkScriptAll(m_Pal->pMark);
 
     //表数据
     int n_Row;
@@ -658,7 +659,7 @@ void MainWindow::Edit_Enemy(int swtch)
         t = p->rgObject[j].enemy.wEnemyID;
         assert(t >= 0 && t < m_Pal->pal->gpGlobals->g.nEnemy);
         ColumnClass ss{};
-        LPENEMY pEnemy = &(p->lprgEnemy[t]);
+        ENEMY* pEnemy = &(p->lprgEnemy[t]);
         WORD* wp_State = &(pEnemy->wIdleFrames);
 
         ss.ColVarList.resize(totalCol);
@@ -765,7 +766,7 @@ void MainWindow::Edit_Magic(int swtch)
     w_ColData[5].GetData("Y位移", 60, 5, ctrl_Edit, tSHORT);
     w_ColData[6].GetData("效果号", 60, 6, ctrl_Edit, tSHORT);
     w_ColData[7].GetData("速度", 60, 7, ctrl_Edit, tSHORT);
-    w_ColData[8].GetData("保持形象", 60, 8, ctrl_Edit, tSHORT);
+    w_ColData[8].GetData("实时效果", 60, 8, ctrl_Edit, tSHORT);
     w_ColData[9].GetData("声效延迟", 60, 9, ctrl_Edit, tSHORT);
     w_ColData[10].GetData("耗时", 60, 10, ctrl_Edit, tSHORT);
     w_ColData[11].GetData("场景震动", 60, 11, ctrl_Edit, tSHORT);
@@ -1020,8 +1021,8 @@ void MainWindow::Edit_ObjectItem(int swtch)
         auto p = &m_Pal->pal->gpGlobals->g;
         if (!(m_Pal->gpObject_classify[j] & kIsItem))
             continue;
-        auto s_Item = p->rgObject[j].item;
-        auto lpObj = p->rgObject;
+        auto& s_Item = p->rgObject[j].item;
+        auto& lpObj = p->rgObject;
         WORD nFlags = lpObj[j].item.wFlags;
         s_RowData[n_Row].ColVarList.resize(totalCol);
         s_RowData[n_Row].oldRow = n_Row + 1;
@@ -1094,7 +1095,8 @@ void MainWindow::Edit_Parameters(int swtch)
     w_ColData[1].GetData("数额", 120, 1, ctrl_Edit, tWORD);
 
     DataArray & s_RowData = s_Data.d_Array;
-    auto p = m_Pal->pal->gpGlobals;
+    //auto p = m_Pal->pal->gpGlobals.get();
+    auto p = m_Pal->pal->gpGlobals.get();
     s_RowData.resize(2);//行数
     s_RowData[0].ColVarList.resize(2);
     s_RowData[0].ColVarList[0] = "金钱";
@@ -1497,8 +1499,7 @@ MainWindow::MainWindow(QWidget* parent)
 MainWindow::~MainWindow()
 {
     //QString PalDir = m_Pal->PalDir.c_str();//备份游戏目录
-    if (!m_Pal->pal->CheckHeapIntegrity())
-        delete m_Pal;
+    delete m_Pal;
     delete m_Grid;
     delete m_Tree;
     delete m_Edit;
@@ -1508,6 +1509,21 @@ MainWindow::~MainWindow()
 void MainWindow::Set_Tree(int muneNumber)
 {
     static int lastJob;    //生成缺省树
+    
+    //重新装入存档文件,当原存储被清除，或处于初始动态
+    if (m_Pal->pal->gpGlobals->rgSaveData.size() == 0)
+    {
+        m_Pal->pal->gpGlobals->rgSaveData.resize(SAVEFILES);
+        for (size_t i = 0; i < SAVEFILES; i++)
+        {
+            std::string fileName = CPalEvent::PalDir +
+                CPalEvent::va("%d.rpg", i + 1 - cfgAutoSave);
+            if (m_Pal->pal->gpGlobals->IsFileExist(fileName))
+            {
+                m_Pal->pal->gpGlobals->rgSaveData.at(i) = m_Pal->pal->gpGlobals->readAll(fileName);
+            }
+        }
+    }
     if (muneNumber == 2 && JobCtrl != lastJob)
     {
         //装入存档文件
@@ -1527,7 +1543,7 @@ void MainWindow::Set_Tree(int muneNumber)
         //std::sprintf;
         QString Title =
             QString::asprintf
-            (tr("SDLPAL_EDIT 游戏修改工具  游戏数据目录为  %s").toUtf8(), m_Pal->pal->PalDir.c_str());
+            ("SDLPAL_EDIT 游戏修改工具  游戏数据目录为  %s", m_Pal->pal->PalDir.c_str());
         setWindowTitle(Title);
     }
 
@@ -1543,11 +1559,9 @@ void MainWindow::Set_Tree(int muneNumber)
         if (i > WM_ARCHIVES && i <= WM_ARCHIVES_END)
         {
             childItem = new QTreeWidgetItem(QStringList() <<
-                QString::asprintf("%d.rpg", i - WM_ARCHIVES - 
-                    CPalEvent::ggConfig->m_Function_Set[53]));
+                QString::asprintf("%d.rpg", i - WM_ARCHIVES - cfgAutoSave));
             //存档文件测试,从0开始，序号3 = 0
-            if (i - 3 >= CPalEvent::ggConfig->m_Function_Set[47] +
-                CPalEvent::ggConfig->m_Function_Set[53])
+            if (i - 3 >= SAVEFILES)
                 hidden = TRUE;
             else if (m_Pal->pal->gpGlobals->rgSaveData[i - 3].size() == 0)
                 hidden = TRUE;
@@ -1604,12 +1618,6 @@ void MainWindow::setupLayout()
     mainSplitter->addWidget(m_Tree);
     mainSplitter->addWidget(rightSplitter);
     mainSplitter->setHandleWidth(8);
-
-    // 设置初始分割比例（可选）
-    // 例如：左侧占 250px，右侧占剩余；上下各占一半
-    //QList<int> mainSizes;
-    //mainSizes << 250 << width() - 250; // 初始值可动态计算
-    //mainSplitter->setSizes(mainSizes);
 
     QList<int> rightSizes;
     rightSizes << height() * 2 / 3 << height() / 3;
@@ -1722,15 +1730,13 @@ void MainWindow::SelectTreeItem(QTreeWidgetItem* item)
     case WM_OKReturn:
         //返回
     {
-        int maxSaveFile = CPalEvent::ggConfig->m_Function_Set[47] +
-            CPalEvent::ggConfig->m_Function_Set[53];
 
-        m_Pal->pal->gpGlobals->rgSaveData.resize(maxSaveFile);
-        for (size_t i = 0; i < maxSaveFile; i++)
+        m_Pal->pal->gpGlobals->rgSaveData.resize(SAVEFILES);
+        for (size_t i = 0; i < SAVEFILES; i++)
         {
             //将扩大存档文件数量部分装入
             std::string fileName = CPalEvent::PalDir + CPalEvent::va
-            ("%d.rpg", i + 1 - CPalEvent::ggConfig->m_Function_Set[53]);
+            ("%d.rpg", i + 1 - cfgAutoSave);
             if (m_Pal->pal->gpGlobals->IsFileExist(fileName) &&
                 m_Pal->pal->gpGlobals->rgSaveData.at(i).size() == 0)
             {
@@ -1778,7 +1784,7 @@ void MainWindow::SelectTreeItem(QTreeWidgetItem* item)
             }
         }
         //修改目录
-        auto oldDir = m_Pal->pal->PalDir;
+        auto oldDir = m_Pal->pal->PalDir;//复制
         auto ret = DoChangeDir(1);
         if (ret == -1)//强制改变目录
         {
@@ -1813,10 +1819,11 @@ void MainWindow::SelectTreeItem(QTreeWidgetItem* item)
         //测试
     {
         this->hide();
-        auto m_TestRunDialog = new testRun(m_Pal->pal->gpGlobals, this);
+        auto m_TestRunDialog = std::make_unique<testRun>(m_Pal->pal->gpGlobals.get(), this);
+
         m_TestRunDialog->exec();
 
-        delete m_TestRunDialog;
+        m_TestRunDialog.release();
         this->show();
         Set_Tree(0);
         break;
@@ -1824,15 +1831,18 @@ void MainWindow::SelectTreeItem(QTreeWidgetItem* item)
     case WM_RUN://运行
     {
         this->hide();
-        std::thread theThread([]()->void {
+        std::thread theThread([&]()->void {
             CScript::isTestRun = false;//不生成调试信息
-            auto m = new CScript(0, 0, m_Pal->pal->gpGlobals);//
-            //将修改后的存档转到全局变量
-            int maxSaveFile = CPalEvent::ggConfig->m_Function_Set[47];
-            for (int i = 0; i < maxSaveFile; i++)
+            auto m = new CScript(0, 0, m_Pal->pal->gpGlobals.get());//
+
+            //将修改后的存档转到全局变量           
+            for (int i = 0; i < m_Pal->pal->gpGlobals->rgSaveData.size(); i++)
             {
-                m_Pal->pal->gpGlobals->rgSaveData[i] = std::move(m->gpGlobals->rgSaveData[i]);
-                m_Pal->pal->gpGlobals->rgSaveDataChaged[i] = m->gpGlobals->rgSaveDataChaged[i];
+                if (m->gpGlobals->rgSaveDataChaged[i])
+                {
+                    m_Pal->pal->gpGlobals->rgSaveData[i] = (m->gpGlobals->rgSaveData[i]);
+                    m_Pal->pal->gpGlobals->rgSaveDataChaged[i] = m->gpGlobals->rgSaveDataChaged[i];
+                }
             }
             delete m;
             });
@@ -2083,7 +2093,7 @@ void MainWindow::DataUpDate(int Work)
             }
             WORD wEnemyID = get<int>(m_DataArray[r].ColVarList[41]);
             WORD wOenemyID = get<int>(m_DataArray[r].ColVarList[0]);
-            LPENEMY  p_enemy = &(m_Pal->pal->gpGlobals->g.lprgEnemy[wEnemyID]);//ID
+            ENEMY * p_enemy = &(m_Pal->pal->gpGlobals->g.lprgEnemy[wEnemyID]);//ID
             WORD* p_list = &p_enemy->wIdleFrames;
             for (int n = 2; n < 37; n++)
             {
@@ -2285,12 +2295,12 @@ void MainWindow::DataUpDate(int Work)
             }
 
             //更新场景表
-            for (int n_scene = 0, wIndex = 0, wEventObject = 0; n_scene < m_Pal->pal->gpGlobals->g.nScene - 1; n_scene++)
+            for (int n_scene = 0, m_Index = 0, wEventObject = 0; n_scene < m_Pal->pal->gpGlobals->g.nScene - 1; n_scene++)
             {
-                wIndex = m_Pal->pal->gpGlobals->g.rgScene[n_scene + 1].wEventObjectIndex;
-                while (wIndex > m_DataArray[wEventObject].oldRow)
+                m_Index = m_Pal->pal->gpGlobals->g.rgScene[n_scene + 1].wEventObjectIndex;
+                while (m_Index > m_DataArray[wEventObject].oldRow)
                     wEventObject++;
-                if (wIndex < m_DataArray[wEventObject].oldRow)
+                if (m_Index < m_DataArray[wEventObject].oldRow)
                     wEventObject--;
                 m_Pal->pal->gpGlobals->g.rgScene[n_scene + 1].wEventObjectIndex = wEventObject + 1;
             }
@@ -2306,10 +2316,10 @@ void MainWindow::DataUpDate(int Work)
                 //从缓存中载入游戏数据
                 m_Pal->pal->gpGlobals->PAL_LoadGame(m_Pal->pal->gpGlobals->rgSaveData[n_save]);
                 //更新场景表
-                for (int n_scene = 0, wIndex = 0, wEventObject = 0; n_scene < p.nScene - 1; n_scene++)
+                for (int n_scene = 0, m_Index = 0, wEventObject = 0; n_scene < p.nScene - 1; n_scene++)
                 {
-                    wIndex = p.rgScene[n_scene + 1].wEventObjectIndex;
-                    while (wIndex > m_DataArray[wEventObject].oldRow)
+                    m_Index = p.rgScene[n_scene + 1].wEventObjectIndex;
+                    while (m_Index > m_DataArray[wEventObject].oldRow)
                     {
                         wEventObject++;
                         if (wEventObject >= m_DataArray.size())
@@ -2318,7 +2328,7 @@ void MainWindow::DataUpDate(int Work)
                             break;
                         }
                     }
-                    if (wIndex < m_DataArray[wEventObject].oldRow)
+                    if (m_Index < m_DataArray[wEventObject].oldRow)
                         wEventObject--;
                     p.rgScene[n_scene + 1].wEventObjectIndex = wEventObject + 1;
                 }
@@ -2486,7 +2496,8 @@ void MainWindow::DataUpDate(int Work)
     case WM_ScriptEntry://脚本入口
     {
 
-        auto paldatabak = m_Pal->pal->gpGlobals;
+        auto paldatabak = std::make_unique<CPalData>(*m_Pal->pal->gpGlobals);
+
         //制作新旧行对照表
         MAPScript st;//生成新旧行号对照表
         for (int k = 0; k < nsize; k++)
@@ -2533,7 +2544,7 @@ void MainWindow::DataUpDate(int Work)
                         continue;
                     //出错，删除不能删除的行
                     //失败恢复原数据
-                    m_Pal->pal->gpGlobals = paldatabak;
+                    m_Pal->pal->gpGlobals = std::move( paldatabak);
                     showErr();
                     return;
                 }
@@ -2546,7 +2557,7 @@ void MainWindow::DataUpDate(int Work)
                     if (m_Pal->SingleScriptChange(m_DataArray[r].oldRow - 1, r, st))
                     {
                         //失败恢复原数据
-                        m_Pal->pal->gpGlobals = paldatabak;
+                        m_Pal->pal->gpGlobals = std::move( paldatabak);
                         showErr();
                         return;
                     }
@@ -2612,7 +2623,7 @@ void MainWindow::DataUpDate(int Work)
             newExplain.insert(newExplain.end(),cs.begin(),cs.end());
         }
         oldExplain = std::move(newExplain);
-        m_Pal->pal->gpGlobals->lpObjectDesc = 
+        m_Pal->pal->gpGlobals->rgObjectDesc = 
             m_Pal->pal->gpGlobals->PAL_LoadObjectDesc();
         //标识修改
         m_Pal->ModifRecord[modRoc_descDat] = TRUE;
@@ -2693,9 +2704,9 @@ void MainWindow::DataUpDate(int Work)
         for (int r = 0; r < nsize; r++)
         {
             //修改游戏设置
-            m_Pal->pal->ggConfig->m_Function_Set[r] = get<int>(m_DataArray[r].ColVarList[1]);
+            CConfig::m_Function_Set[r] = get<int>(m_DataArray[r].ColVarList[1]);
         }
-        if (int k = ( m_Pal->pal->ggConfig->m_Function_Set[47] + m_Pal->pal->ggConfig->m_Function_Set[53])
+        if (int k = ( SAVEFILES)
             != m_Pal->pal->gpGlobals->rgSaveData.size())
         {
             m_Pal->pal->gpGlobals->rgSaveData.resize(k);

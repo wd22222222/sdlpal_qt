@@ -1,3 +1,4 @@
+
 /* -*- mode: c; tab-width: 4; c-basic-offset: 3; c-file-style: "linux" -*- */
 //
 // Copyright (c) 2009, Wei Mingzhi <whistler_wmz@users.sf.net>.
@@ -18,135 +19,11 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
+
 #include "cpalbaseio.h"
 #include "cpaldata.h"
 #include <assert.h>
  
-#define   UTIL_malloc malloc
-
-VOID CPalBaseIO::PAL_FreeEventObjectSprites(
-	VOID
-)
-/*++
-  Purpose:
-
-  Free all sprites of event objects on the scene.
-
-  Parameters:
-
-  None.
-
-  Return value:
-
-  None.
-
-  --*/
-{
-	int i;
-
-	if (gpResources && gpResources->lppEventObjectSprites != NULL)
-	{
-		for (i = 0; i < gpResources->nEventObject; i++)
-		{
-			free(gpResources->lppEventObjectSprites[i]);
-		}
-
-		free(gpResources->lppEventObjectSprites);
-
-		gpResources->lppEventObjectSprites = NULL;
-		gpResources->nEventObject = 0;
-	}
-}
-
-VOID CPalBaseIO::PAL_FreePlayerSprites(
-	VOID
-)
-/*++
-  Purpose:
-
-  Free all player sprites.
-
-  Parameters:
-
-  None.
-
-  Return value:
-
-  None.
-
-  --*/
-{
-	int i;
-	if (!gpResources)
-		return;
-	for (i = 0; i < MAX_PLAYERS_IN_PARTY + 1; i++)
-	{
-		free(gpResources->rglpPlayerSprite[i]);
-		gpResources->rglpPlayerSprite[i] = NULL;
-	}
-}
-
-VOID CPalBaseIO::PAL_InitResources(
-	VOID
-)
-/*++
-  Purpose:
-
-  Initialze the resource manager.
-
-  Parameters:
-
-  None.
-
-  Return value:
-
-  None.
-
-  --*/
-{
-	gpResources = (LPRESOURCES)UTIL_calloc(1, sizeof(RESOURCES));
-}
-
-VOID CPalBaseIO::PAL_FreeResources(
-	VOID
-)
-/*++
-  Purpose:
-
-  Free all loaded resources.
-
-  Parameters:
-
-  None.
-
-  Return value:
-
-  None.
-
-  --*/
-{
-	if (gpResources != NULL)
-	{
-		//
-		// Free all loaded sprites
-		//
-		PAL_FreePlayerSprites();
-		PAL_FreeEventObjectSprites();
-
-		//
-		// Free map
-		//
-		PAL_FreeMap(gpResources->lpMap);
-
-		//
-		// Delete the instance
-		//
-		free(gpResources);
-	}
-
-	gpResources = NULL;
-}
-
 VOID CPalBaseIO::PAL_SetLoadFlags(
 	BYTE       bFlags
 )
@@ -182,8 +59,8 @@ VOID CPalBaseIO::PAL_LoadResources(
 
 --*/
 {
-	int                i, index, l, n;
-	WORD               wPlayerID, wSpriteNum;
+	//int                i, index, l, n;
+	//WORD               wPlayerID, wSpriteNum;
 
 	if (gpResources == NULL || gpResources->bLoadFlags == 0)
 	{
@@ -197,8 +74,6 @@ VOID CPalBaseIO::PAL_LoadResources(
 	{
 		//FILE* fpMAP, * fpGOP;
 
-		//auto fpMAP = UTIL_OpenRequiredFile("map.mkf");
-		//auto fpGOP = UTIL_OpenRequiredFile("gop.mkf");
 		auto& fpMAP = gpGlobals->f.fpMAP;
 		auto& fpGOP = gpGlobals->f.fpGOP;
 		if (gpGlobals->fEnteringScene)
@@ -210,15 +85,12 @@ VOID CPalBaseIO::PAL_LoadResources(
 		//
 		// Free previous loaded scene (sprites and map)
 		//
-		PAL_FreeEventObjectSprites();
-		PAL_FreeMap(gpResources->lpMap);
 
 		//
 		// Load map
 		//
-		i = gpGlobals->wNumScene - 1;
-		gpResources->lpMap = PAL_LoadMap(gpGlobals->g.rgScene[i].wMapNum,
-			fpMAP, fpGOP);
+		int i = gpGlobals->wNumScene - 1;
+		gpResources->lpMap = PAL_LoadMap(gpGlobals->g.rgScene[i].wMapNum,fpMAP, fpGOP);
 
 		if (gpResources->lpMap == NULL)
 		{
@@ -229,38 +101,32 @@ VOID CPalBaseIO::PAL_LoadResources(
 		//
 		// Load sprites
 		//
-		index = gpGlobals->g.rgScene[i].wEventObjectIndex;
+		auto index = gpGlobals->g.rgScene[i].wEventObjectIndex;
 		gpResources->nEventObject = gpGlobals->g.rgScene[i + 1].wEventObjectIndex;
 		gpResources->nEventObject -= index;
 
 		if (gpResources->nEventObject > 0)
 		{
-			gpResources->lppEventObjectSprites =
-				(LPSPRITE*)UTIL_calloc(gpResources->nEventObject, sizeof(LPSPRITE));
+			gpResources->lppEventObjectSprites.resize(gpResources->nEventObject);
 		}
 
 		for (i = 0; i < gpResources->nEventObject; i++, index++)
 		{
-			n = gpGlobals->g.lprgEventObject[index].wSpriteNum;
+			auto n = gpGlobals->g.lprgEventObject[index].wSpriteNum;
 			if (n == 0)
 			{
 				//
 				// this event object has no sprite
 				//
-				gpResources->lppEventObjectSprites[i] = NULL;
+				gpResources->lppEventObjectSprites[i].clear();
 				continue;
 			}
-
-			l = PAL_MKFGetDecompressedSize(n, gpGlobals->f.fpMGO);
-
-			gpResources->lppEventObjectSprites[i] = (LPSPRITE)UTIL_malloc(l);
-
-			if (PAL_MKFDecompressChunk(gpResources->lppEventObjectSprites[i], l,
-				n, gpGlobals->f.fpMGO) > 0)
-			{
+			gpResources->lppEventObjectSprites[i] = PAL_MKFDecompressChunk(n, gpGlobals->f.fpMGO);
+			
+			if (gpResources->lppEventObjectSprites[i].size())
 				gpGlobals->g.lprgEventObject[index].nSpriteFramesAuto =
-					PAL_SpriteGetNumFrames(gpResources->lppEventObjectSprites[i]);
-			}
+				PAL_SpriteGetNumFrames(gpResources->lppEventObjectSprites[i]);
+
 		}
 
 
@@ -279,24 +145,20 @@ VOID CPalBaseIO::PAL_LoadResources(
 		//
 		// Free previous loaded player sprites
 		//
-		PAL_FreePlayerSprites();
-
-		for (i = 0; i <= (short)gpGlobals->wMaxPartyMemberIndex; i++)
+		//PAL_FreePlayerSprites(gpResources);
+		int i{};
+		for ( i = 0; i <= (short)gpGlobals->wMaxPartyMemberIndex; i++)
 		{
-			wPlayerID = gpGlobals->rgParty[i].wPlayerRole;
+			auto wPlayerID = gpGlobals->rgParty[i].wPlayerRole;
 			assert(wPlayerID < MAX_PLAYER_ROLES);
 
 			//
 			// Load player sprite
 			//
-			wSpriteNum = gpGlobals->g.PlayerRoles.rgwSpriteNum[wPlayerID];
+			auto wSpriteNum = gpGlobals->g.PlayerRoles.rgwSpriteNum[wPlayerID];
 
-			l = PAL_MKFGetDecompressedSize(wSpriteNum, gpGlobals->f.fpMGO);
+			gpResources->rglpPlayerSprite[i] = PAL_MKFDecompressChunk(wSpriteNum, gpGlobals->f.fpMGO);
 
-			gpResources->rglpPlayerSprite[i] = (LPSPRITE)UTIL_malloc(l);
-
-			PAL_MKFDecompressChunk(gpResources->rglpPlayerSprite[i], l, wSpriteNum,
-				gpGlobals->f.fpMGO);
 		}
 
 		if (gpGlobals->nFollower > 0)
@@ -304,14 +166,10 @@ VOID CPalBaseIO::PAL_LoadResources(
 			//
 			// Load the follower sprite
 			//
-			wSpriteNum = gpGlobals->rgParty[i].wPlayerRole;
+			auto wSpriteNum = gpGlobals->rgParty[i].wPlayerRole;
 
-			l = PAL_MKFGetDecompressedSize(wSpriteNum, gpGlobals->f.fpMGO);
-
-			gpResources->rglpPlayerSprite[i] = (LPSPRITE)UTIL_malloc(l);
-
-			PAL_MKFDecompressChunk(gpResources->rglpPlayerSprite[i], l, wSpriteNum,
-				gpGlobals->f.fpMGO);
+	
+			gpResources->rglpPlayerSprite[i] = PAL_MKFDecompressChunk(wSpriteNum, gpGlobals->f.fpMGO);
 		}
 	}
 
@@ -321,9 +179,7 @@ VOID CPalBaseIO::PAL_LoadResources(
 	gpResources->bLoadFlags = 0;
 }
 
-LPPALMAP CPalBaseIO::PAL_GetCurrentMap(
-	VOID
-)
+LPPALMAP CPalBaseIO::PAL_GetCurrentMap()const
 /*++
   Purpose:
 
@@ -344,12 +200,10 @@ LPPALMAP CPalBaseIO::PAL_GetCurrentMap(
 		return NULL;
 	}
 
-	return gpResources->lpMap;
+	return gpResources->lpMap.get();
 }
 
-LPSPRITE CPalBaseIO::PAL_GetPlayerSprite(
-	BYTE      bPlayerIndex
-)
+LPCSPRITE CPalBaseIO::PAL_GetPlayerSprite(BYTE bPlayerIndex)const
 /*++
   Purpose:
 
@@ -370,12 +224,12 @@ LPSPRITE CPalBaseIO::PAL_GetPlayerSprite(
 		return NULL;
 	}
 
-	return gpResources->rglpPlayerSprite[bPlayerIndex];
+	return gpResources->rglpPlayerSprite[bPlayerIndex].data();
 }
 
-LPSPRITE CPalBaseIO::PAL_GetEventObjectSprite(
+LPCSPRITE CPalBaseIO::PAL_GetEventObjectSprite(
 	WORD      wEventObjectID
-)
+)const
 /*++
   Purpose:
 
@@ -394,17 +248,17 @@ LPSPRITE CPalBaseIO::PAL_GetEventObjectSprite(
 	wEventObjectID -= gpGlobals->g.rgScene[gpGlobals->wNumScene - 1].wEventObjectIndex;
 	wEventObjectID--;
 
-	if (gpResources == NULL || wEventObjectID >= gpResources->nEventObject)
+	if (!gpResources || wEventObjectID >= gpResources->nEventObject)
 	{
 		return NULL;
 	}
 
-	return gpResources->lppEventObjectSprites[wEventObjectID];
+	return gpResources->lppEventObjectSprites[wEventObjectID].data();
 }
 
 WORD CPalBaseIO::PAL_SpriteGetNumFrames(
 	LPCSPRITE       lpSprite
-)
+)const
 /*++
   Purpose:
 
@@ -426,4 +280,49 @@ WORD CPalBaseIO::PAL_SpriteGetNumFrames(
 	}
 
 	return (lpSprite[0] | (lpSprite[1] << 8)) - 1;
+}
+
+VOID CPalBaseIO::PAL_InitResources(VOID)
+{
+	//gpResources = (LPRESOURCES)UTIL_calloc(1, sizeof(RESOURCES));
+	gpResources = std::make_unique<RESOURCES>();
+}
+
+VOID CPalBaseIO::PAL_FreeResources(VOID)
+/*++
+Purpose:
+
+Free all loaded resources.
+
+Parameters:
+
+None.
+
+Return value:
+
+None.
+
+--*/
+{
+	if (gpResources != NULL)
+	{
+		gpResources.release();
+		//
+		// Free all loaded sprites
+		//
+		//PAL_FreePlayerSprites(gpResources);
+		//PAL_FreeEventObjectSprites(gpResources);
+
+		//
+		// Free map
+		//
+		//PAL_FreeMap(gpResources->lpMap);
+
+		//
+		// Delete the instance
+		//
+		//free(gpResources);
+	}
+
+	gpResources = NULL;
 }

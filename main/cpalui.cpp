@@ -1,3 +1,6 @@
+#include "cpalui.h"
+#include "cpalui.h"
+#include "cpalui.h"
 ///* -*- mode: c; tab-width: 4; c-basic-offset: 4; c-file-style: "linux" -*- */
 //
 // Copyright (c) 2009-2011, Wei Mingzhi <whistler_wmz@users.sf.net>.
@@ -47,7 +50,7 @@ INT CPalUI::PAL_RLEBlitToSurface(
     PAL_POS           pos,
     BOOL              bShadow,
     BOOL              d  
-)
+)const
 /*++
   Purpose:
 
@@ -246,13 +249,13 @@ end:
     return 0;
 }
 
-INT CPalUI::PAL_RLEBlitToSurface(LPCBITMAPRLE lpBitmapRLE, PalSurface& lpDstSurface, PAL_POS pos, BOOL bShadow, BOOL d)
+INT CPalUI::PAL_RLEBlitToSurface(LPCBITMAPRLE lpBitmapRLE, PalSurface& lpDstSurface, PAL_POS pos, BOOL bShadow, BOOL d)const
 {
     return PAL_RLEBlitToSurface(lpBitmapRLE, lpDstSurface.get(), pos, bShadow, d);
 }
 
 INT CPalUI::PAL_RLEBlitToSurface(LPCBITMAPRLE lpBitmapRLE, PalTexture &bDstTexture,
-    PAL_POS pos, BOOL bShadow, BOOL d)
+    PAL_POS pos, BOOL bShadow, BOOL d)const
 {
     
     if (lpBitmapRLE == NULL || bDstTexture.isNull())
@@ -274,12 +277,15 @@ INT CPalUI::PAL_RLEBlitToSurface(LPCBITMAPRLE lpBitmapRLE, PalTexture &bDstTextu
     //
     auto w = lpBitmapRLE[0] | (lpBitmapRLE[1] << 8);
     auto h = lpBitmapRLE[2] | (lpBitmapRLE[3] << 8);
+    
     PalSurface s(gpPalette, w, h);
     PAL_RLEBlitToSurface(lpBitmapRLE, s.get(), 0, bShadow, d);
     PAL_Rect dRect(PAL_X(pos), PAL_Y(pos), w, h);
-	dRect *= PictureRatio;
+    if (bDstTexture.width() == RealWidth)
+        dRect *= PictureRatio;
+
     pCScript->setTransColor(gpPalette->colors[255]);
-    pCScript->RenderBlendCopy(pCScript->gpTextureReal, s, 255, RenderMode::rmMode3, 0, &dRect);
+    pCScript->RenderBlendCopy(bDstTexture, s, 255, RenderMode::rmMode3, 0, &dRect);
     return 0;
 }
 
@@ -292,7 +298,7 @@ CPalUI::PAL_RLEBlitWithColorShift(
     PAL_POS           pos,
     INT               iColorShift,
     BOOL
-)
+)const
 /*++
   Purpose:
 
@@ -489,7 +495,8 @@ end:
     return 0;
 }
 
-INT CPalUI::PAL_RLEBlitWithColorShift(LPCBITMAPRLE lpBitmapRLE, PalTexture& lpDstSurface, PAL_POS pos, INT iColorShift, BOOL d)
+INT CPalUI::PAL_RLEBlitWithColorShift(
+    LPCBITMAPRLE lpBitmapRLE, PalTexture& lpDstSurface, PAL_POS pos, INT iColorShift, BOOL d)const
 {
     //
     // Check for NULL pointer.
@@ -526,7 +533,7 @@ INT
 CPalUI::PAL_FBPBlitToSurface(
     LPBYTE            lpBitmapFBP,
     SDL_Surface* lpDstSurface
-)
+)const
 /*++
   Purpose:
 
@@ -578,11 +585,18 @@ CPalUI::PAL_FBPBlitToSurface(
     return 0;
 }
 
-INT CPalUI::PAL_FBPBlitToSurface(LPBYTE lpBitmapFBP, PalTexture& lpDstSurface)
+INT CPalUI::PAL_FBPBlitToSurface(LPBYTE lpBitmapFBP, PalTexture& lpDstSurface)const
 {
     PalSurface m(gpPalette, 320, 200);
     PAL_FBPBlitToSurface(lpBitmapFBP, m.get());
-    pCScript->RenderBlendCopy(pCScript->gpTextureReal, m);
+    pCScript->RenderBlendCopy(lpDstSurface, m);
+    return SDL_GetError() != nullptr;
+}
+
+INT CPalUI::PAL_FBPBlitToSurface(LPBYTE lpBitmapFBP, PalSurface& lpDstSurface) const
+{
+    PAL_FBPBlitToSurface(lpBitmapFBP, lpDstSurface.get());
+    pCScript->RenderBlendCopy(pCScript->gpTextureReal, lpDstSurface);
     return SDL_GetError() != nullptr;
 }
 
@@ -641,7 +655,12 @@ CPalUI::PAL_SpriteGetFrame(
     return &lpSprite[offset];
 }
 
-UINT CPalUI::PAL_RLEGetWidth(LPCBITMAPRLE lpBitmapRLE)
+LPCBITMAPRLE CPalUI::PAL_SpriteGetFrame(const ByteArray& lpSprite, INT iFrameNum)
+{
+    return  PAL_SpriteGetFrame(lpSprite.data(), iFrameNum);
+}
+
+const UINT CPalUI::PAL_RLEGetWidth(LPCBITMAPRLE lpBitmapRLE)const
 /*++
 Purpose:
 
@@ -677,7 +696,7 @@ Integer value which indicates the height of the bitmap.
     return lpBitmapRLE[0] | (lpBitmapRLE[1] << 8);
 }
 
-UINT CPalUI::PAL_RLEGetHeight(LPCBITMAPRLE lpBitmapRLE)
+const UINT CPalUI::PAL_RLEGetHeight(LPCBITMAPRLE lpBitmapRLE)const
 /*++
 Purpose:
 

@@ -1083,9 +1083,9 @@ INT CPalData::is_Use_YJ1_Decompress()
 
 PalErr CPalData::PAL_DeCompress(LPCVOID Source, LPVOID Destination, INT DestSize)
 {
-	assert(CConfig::fisUSEYJ1DeCompress != -1);
+	assert(cfgIsUSEYJ1DeCompress != -1);
 
-	if (CConfig::fisUSEYJ1DeCompress)
+	if (cfgIsUSEYJ1DeCompress)
 		return YJ1_Decompress(Source, Destination, DestSize);
 	else
 		return YJ2_Decompress(Source, Destination, DestSize);
@@ -1775,9 +1775,9 @@ PalErr CPalData::EncodeYJ2(const void* Source, UINT32 SourceLength, void*& Desti
 
 PalErr CPalData::EnCompress(const void* Source, UINT32 SourceLength, void*& Destination, UINT32& Length, bool bCopatible)
 {
-	assert(CConfig::fisUSEYJ1DeCompress != -1);
+	assert(cfgIsUSEYJ1DeCompress != -1);
 		//fisUSEYJ1DeCompress = is_Use_YJ1_Decompress();
-	if (CConfig::fisUSEYJ1DeCompress)
+	if (cfgIsUSEYJ1DeCompress)
 		return EncodeYJ1( Source, SourceLength,  Destination,  Length);
 	else
 		return EncodeYJ2(Source, SourceLength, Destination, Length, bCopatible);

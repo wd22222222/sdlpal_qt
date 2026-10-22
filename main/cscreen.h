@@ -113,7 +113,7 @@ public:
 
     PalErr RenderBlendCopy(PalTexture& rpRender, PalTexture& rpText1,
         const WORD rAlpha = 255, const RenderMode mode = RenderMode::rmMode1, const SDL_Color* rColor = NULL,
-        const SDL_Rect* dstRect = NULL, const SDL_Rect* srcRect = NULL);
+        const SDL_Rect* dstRect = NULL, const SDL_Rect* srcRect = NULL)const;
 
     PalErr RenderBlendCopy(PalTexture& rpRender, SDL_Surface* rpSurf,
         const WORD rAlpha = 255, const RenderMode mode = RenderMode::rmMode1, const SDL_Color* rColor = NULL,
@@ -139,6 +139,10 @@ public:
     inline VOID setTransColor(const  SDL_Color& a) { 
         g_TransColor = PAL_fColor( a); 
     };
+    inline const PAL_fColor getTransColor()const
+    {
+        return g_TransColor;
+    }
     VOID ClearScreen(const SDL_Rect* sRect = NULL);
     void PAL_DrawMouseInputBox();
     void PAL_CreateMouseInputBoxText();
@@ -201,8 +205,10 @@ public:
     SDL_Renderer*   gpRenderer{};
 private:
 
-    void  setRectToArr(const SDL_Rect* src, const SDL_Rect* dst, const Pal_Size srcSize, const Pal_Size dstSize);;
-    std::vector<GLfloat> g_vertices;//位置顶点数组
+    std::vector<GLfloat> setRectToArr(const SDL_Rect* src, const SDL_Rect* dst, 
+        const Pal_Size srcSize, const Pal_Size dstSize )const;
+    
+    GLfloat g_vertices[16];//位置顶点数组
 
     VOID glPreInit();
     int KeepAspectRatio{ TRUE };

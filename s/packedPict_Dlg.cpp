@@ -351,17 +351,17 @@ void PackedPict_Dlg::makeImage()
 		QImage m = QImage(MapPixWidth, MapPixHight, QImage::Format_Indexed8);
 		m.setColorTable(m_Pal->sdl_PaltteToQColorList( m_Pal->pal->gpPalette->colors));
 		m.fill(0);
-		m_Pal->m_pPalMap = pal->PAL_LoadMap(m_ListSelectRow, *lpfBuf, *lpGopBuf);
-		if (!m_Pal->m_pPalMap)
+		m_Pal->pal->gpResources->lpMap = pal->PAL_LoadMap(m_ListSelectRow, *lpfBuf, *lpGopBuf);
+		if (!m_Pal->pal->gpResources->lpMap)
 		{
 			m_NoDraw = 1;
 			return;
 		}
 		PAL_Rect rect = { 0,0,MapPixWidth,MapPixHight };
 		//画底层
-		m_Pal->PAL_MapBlitToSurface(m_Pal->m_pPalMap, m, &rect, 0);
+		m_Pal->PAL_MapBlitToSurface(m_Pal->pal->gpResources->lpMap.get(), m, &rect, 0);
 		//画顶层
-		m_Pal->PAL_MapBlitToSurface(m_Pal->m_pPalMap, m, &rect, 1);
+		m_Pal->PAL_MapBlitToSurface(m_Pal->pal->gpResources->lpMap.get(), m, &rect, 1);
 		m_Map = m.convertToFormat(colorFormat);
 		//画障碍
 		DrawObstacles(m_Map, &rect);
@@ -456,7 +456,7 @@ void PackedPict_Dlg::ObjectPopMenuRetuen(UINT msg)
 			//分两部分，地图数据，地图图像
 		{
 			//图像
-			auto count = *(WORD*)m_Pal->m_pPalMap->pTileSprite;
+			auto count = *(WORD*)m_Pal->pal->gpResources->lpMap->pTileSprite.data();
 			if (count == 0)
 				return;
 			for (int i = 0; i < count; i++)
@@ -465,7 +465,7 @@ void PackedPict_Dlg::ObjectPopMenuRetuen(UINT msg)
 				QImage m(32, 15, QImage::Format_Indexed8);
 				m.setColorTable(m_Pal->sdl_PaltteToQColorList( m_Pal->pal->gpPalette->colors));
 				m.fill(m_Pal->sdl_colorToUint( m_Pal->pal->gpPalette->colors[0]));
-				auto lpSprite = m_Pal->pal->PAL_SpriteGetFrame((LPBYTE)m_Pal->m_pPalMap->pTileSprite, i);
+				auto lpSprite = CPalUI::PAL_SpriteGetFrame(m_Pal->pal->gpResources->lpMap->pTileSprite, i);
 				if (lpSprite)
 				{
 					m_Pal->PAL_RLEBlitToSurface(lpSprite, m, 0);
@@ -473,10 +473,10 @@ void PackedPict_Dlg::ObjectPopMenuRetuen(UINT msg)
 				m.save(saveImage,"BMP");
 			}
 			QString saveMap = QString::asprintf("%s%s", sDir.toStdString().c_str(),"map");
-			auto s = (LPBYTE)m_Pal->m_pPalMap->MapTiles;
+			auto s = (LPBYTE)m_Pal->pal->gpResources->lpMap->MapTiles;
 			QFile f(saveMap);
 			f.open(QIODevice::WriteOnly);
-			f.write((LPCSTR)s,sizeof(m_Pal->m_pPalMap->MapTiles));
+			f.write((LPCSTR)s,sizeof(m_Pal->pal->gpResources->lpMap->MapTiles));
 			f.close();
 			break;
 		}

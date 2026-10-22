@@ -45,8 +45,8 @@ VOID CEnemy::PAL_New_DecreaseHPForEnemy(
 	}
 
 	if (iDamage > 0)
-	{   //使用min比较不同类型的正负数的时候有时候会不符合预期
-        iDamage = std::min(iDamage, (int)g_Battle.rgEnemy[wEnemyIndex].dwActualHealth);
+	{
+		iDamage = std::min(iDamage, (int)g_Battle.rgEnemy[wEnemyIndex].dwActualHealth);
 	}
 	g_Battle.rgEnemy[wEnemyIndex].dwActualHealth -= iDamage;
 #ifndef  LIN_TIAN_NAN_BUG
@@ -63,7 +63,6 @@ VOID CEnemy::PAL_New_CurePoisonForEnemyByKind(
 )
 {
 	int j;
-	//auto gConfig = gpGlobals->gConfig;
 	WORD wObjectID = g_Battle.rgEnemy[wEnemyIndex].wObjectID;
 	if (wEnemyIndex >= MAX_ENEMIES_IN_TEAM || wObjectID == 0)
 	{
@@ -74,17 +73,14 @@ VOID CEnemy::PAL_New_CurePoisonForEnemyByKind(
 	{
 		if (g_Battle.rgEnemy[wEnemyIndex].rgPoisons[j].wPoisonID == wPoisonID)
 		{
-//#ifdef POISON_STATUS_EXPAND
-			if (ggConfig->m_Function_Set[0])
+			if (cfgPoisonUp)
 				memset(&g_Battle.rgEnemy[wEnemyIndex].rgPoisons[j], 0,
 					sizeof(g_Battle.rgEnemy[wEnemyIndex].rgPoisons[j]));
-//#else
 			else
 			{
 				g_Battle.rgEnemy[wEnemyIndex].rgPoisons[j].wPoisonID = 0;
 				g_Battle.rgEnemy[wEnemyIndex].rgPoisons[j].wPoisonScript = 0;
 			}
-//#endif
 			break;
 		}
 	}
@@ -110,28 +106,25 @@ VOID CEnemy::PAL_New_CurePoisonForEnemyByLevel(
 		if (gpGlobals->g.rgObject[w].poison.wPoisonLevel <= wMaxLevel)
 		{
 
-//#ifdef POISON_STATUS_EXPAND
-			if (ggConfig->m_Function_Set[0])
+			if (cfgPoisonUp)
 			{
 				memset(&g_Battle.rgEnemy[wEnemyIndex].rgPoisons[j], 0, sizeof(g_Battle.rgEnemy[wEnemyIndex].rgPoisons[j]));
 			}
-//#else
 			else
 			{
 				g_Battle.rgEnemy[wEnemyIndex].rgPoisons[j].wPoisonID = 0;
 				g_Battle.rgEnemy[wEnemyIndex].rgPoisons[j].wPoisonScript = 0;
 			}
-//#endif
 			break;
 		}
 	}
 }
 
 
-INT CEnemy::PAL_New_GetPoisonIndexForEnemy(
+const INT CEnemy::PAL_New_GetPoisonIndexForEnemy(
 	WORD		wEnemyIndex,
 	WORD		wPoisonID
-)
+)const
 {
 	int i;
 
@@ -176,8 +169,7 @@ Return value:    None.
 	{
 		if (g_Battle.rgEnemy[wEnemyIndex].rgPoisons[j].wPoisonID == wPoisonID)
 		{
-//#ifdef POISON_STATUS_EXPAND // 增加毒的烈度
-			if (ggConfig->m_Function_Set[0])
+			if (cfgPoisonUp)
 			{
 				INT iSuccessRate = 100;
 				WORD wPoisonLevel = gpGlobals->g.rgObject[wPoisonID].poison.wPoisonLevel;
@@ -224,10 +216,8 @@ Return value:    None.
 	g_Battle.rgEnemy[wEnemyIndex].rgPoisons[j].wPoisonID = wPoisonID;
 	g_Battle.rgEnemy[wEnemyIndex].rgPoisons[j].wPoisonScript = gpGlobals->g.rgObject[wPoisonID].poison.wEnemyScript;
 
-//#ifdef POISON_STATUS_EXPAND // 增加毒的烈度
-	if (ggConfig->m_Function_Set[0])
+	if (cfgPoisonUp)
 		g_Battle.rgEnemy[wEnemyIndex].rgPoisons[j].wPoisonIntensity = 0;
-//#endif
 }
 
 
@@ -235,20 +225,16 @@ VOID CEnemy::PAL_New_SortPoisonsForEnemyByLevel(
 	WORD		wEnemyIndex
 )
 {
-	int         i, j, PoisonNum;
-	WORD        wPoisonID1, wPoisonID2;
-	WORD        wPoisonLevel1, wPoisonLevel2;
-	POISONSTATUS	tempPoison;
 
 	WORD wObjectID = g_Battle.rgEnemy[wEnemyIndex].wObjectID;
 	if (wEnemyIndex >= MAX_ENEMIES_IN_TEAM || wObjectID == 0)
 	{
 		return;
 	}
-
-	for (j = 0, PoisonNum = 0; j < MAX_POISONS; j++)
+	int PoisonNum{};
+	for (int j = 0; j < MAX_POISONS; j++)
 	{
-		wPoisonID1 = g_Battle.rgEnemy[wEnemyIndex].rgPoisons[j].wPoisonID;
+		auto wPoisonID1 = g_Battle.rgEnemy[wEnemyIndex].rgPoisons[j].wPoisonID;
 		if (wPoisonID1 == 0)
 		{
 			g_Battle.rgEnemy[wEnemyIndex].rgPoisons[j].wPoisonID = 0;
@@ -264,18 +250,18 @@ VOID CEnemy::PAL_New_SortPoisonsForEnemyByLevel(
 		return;
 	}
 
-	for (i = 0; i < MAX_POISONS - 1; i++)
+	for (int i = 0; i < MAX_POISONS - 1; i++)
 	{
-		for (j = 0; j < MAX_POISONS - i - 1; j++)
+		for (int j = 0; j < MAX_POISONS - i - 1; j++)
 		{
-			wPoisonID1 = g_Battle.rgEnemy[wEnemyIndex].rgPoisons[j].wPoisonID;
-			wPoisonLevel1 = gpGlobals->g.rgObject[wPoisonID1].poison.wPoisonLevel;
-			wPoisonID2 = g_Battle.rgEnemy[wEnemyIndex].rgPoisons[j + 1].wPoisonID;
-			wPoisonLevel2 = gpGlobals->g.rgObject[wPoisonID2].poison.wPoisonLevel;
+			auto wPoisonID1 = g_Battle.rgEnemy[wEnemyIndex].rgPoisons[j].wPoisonID;
+			auto wPoisonLevel1 = gpGlobals->g.rgObject[wPoisonID1].poison.wPoisonLevel;
+			auto wPoisonID2 = g_Battle.rgEnemy[wEnemyIndex].rgPoisons[j + 1].wPoisonID;
+			auto wPoisonLevel2 = gpGlobals->g.rgObject[wPoisonID2].poison.wPoisonLevel;
 
 			if (wPoisonLevel1 < wPoisonLevel2)
 			{
-				tempPoison = g_Battle.rgEnemy[wEnemyIndex].rgPoisons[j];
+				auto tempPoison = g_Battle.rgEnemy[wEnemyIndex].rgPoisons[j];
 				g_Battle.rgEnemy[wEnemyIndex].rgPoisons[j] = g_Battle.rgEnemy[wEnemyIndex].rgPoisons[j + 1];
 				g_Battle.rgEnemy[wEnemyIndex].rgPoisons[j + 1] = tempPoison;
 			}
@@ -284,9 +270,7 @@ VOID CEnemy::PAL_New_SortPoisonsForEnemyByLevel(
 	return;
 }
 
-WORD CEnemy::PAL_New_GetEnemySorceryResistance(
-	WORD		wEnemyIndex
-)
+const WORD CEnemy::PAL_New_GetEnemySorceryResistance(WORD wEnemyIndex)const
 {
 	WORD wObjectID = g_Battle.rgEnemy[wEnemyIndex].wObjectID;
 	if (wEnemyIndex >= MAX_ENEMIES_IN_TEAM || wObjectID == 0)
@@ -299,9 +283,7 @@ WORD CEnemy::PAL_New_GetEnemySorceryResistance(
     return std::min((int)w, 100);
 }
 
-WORD CEnemy::PAL_New_GetEnemyPoisonResistance(
-	WORD		wEnemyIndex
-)
+const WORD CEnemy::PAL_New_GetEnemyPoisonResistance(WORD wEnemyIndex)const
 {
 	WORD wObjectID = g_Battle.rgEnemy[wEnemyIndex].wObjectID;
 	if (wEnemyIndex >= MAX_ENEMIES_IN_TEAM || wObjectID == 0)
@@ -314,9 +296,7 @@ WORD CEnemy::PAL_New_GetEnemyPoisonResistance(
     return std::min((int)w, 100);
 }
 
-WORD CEnemy::PAL_New_GetEnemyPhysicalResistance(
-	WORD		wEnemyIndex
-)
+const WORD CEnemy::PAL_New_GetEnemyPhysicalResistance(WORD wEnemyIndex)const
 {
 	WORD wObjectID = g_Battle.rgEnemy[wEnemyIndex].wObjectID;
 	if (wEnemyIndex >= MAX_ENEMIES_IN_TEAM || wObjectID == 0)
@@ -329,10 +309,10 @@ WORD CEnemy::PAL_New_GetEnemyPhysicalResistance(
     return std::min((int)w, 100);
 }
 
-WORD CEnemy::PAL_New_GetEnemyElementalResistance(
+const WORD CEnemy::PAL_New_GetEnemyElementalResistance(
 	WORD		wEnemyIndex,
 	INT			iAttrib
-)
+)const
 {
 	WORD wObjectID = g_Battle.rgEnemy[wEnemyIndex].wObjectID;
 	if (wEnemyIndex >= MAX_ENEMIES_IN_TEAM || wObjectID == 0)
@@ -364,11 +344,7 @@ VOID CEnemy::PAL_New_SetEnemyStatus(
 	case kStatusConfused:
 	case kStatusSleep:
 	case kStatusSilence:
-#ifdef PAL_CLASSIC
 	case kStatusParalyzed:
-#else
-	case kStatusSlow:
-#endif
 	case kStatusPuppet:
 	case kStatusBravery:
 	case kStatusProtect:
@@ -392,9 +368,7 @@ VOID CEnemy::PAL_New_SetEnemyStatus(
 	}
 }
 
-WORD CEnemy::PAL_New_GetEnemyAttackStrength(
-	WORD		wEnemyIndex
-)
+const WORD CEnemy::PAL_New_GetEnemyAttackStrength(WORD wEnemyIndex)const
 {
 	WORD wObjectID = g_Battle.rgEnemy[wEnemyIndex].wObjectID;
 	if (wEnemyIndex >= MAX_ENEMIES_IN_TEAM || wObjectID == 0)
@@ -404,7 +378,7 @@ WORD CEnemy::PAL_New_GetEnemyAttackStrength(
 
 	INT s = (SHORT)g_Battle.rgEnemy[wEnemyIndex].e.wAttackStrength;
 
-	if (ggConfig->m_Function_Set[1])//#ifdef EDIT_DAMAGE_CALC
+	if (cfgDmgFormula)//#ifdef cfgDmgFormula
 		s += g_Battle.rgEnemy[wEnemyIndex].e.wLevel * 7;
 	else//#else
 		s += (g_Battle.rgEnemy[wEnemyIndex].e.wLevel + 6) * 6;
@@ -420,9 +394,7 @@ WORD CEnemy::PAL_New_GetEnemyAttackStrength(
 	return (WORD)s;
 }
 
-WORD CEnemy::PAL_New_GetEnemyMagicStrength(
-	WORD		wEnemyIndex
-)
+const WORD CEnemy::PAL_New_GetEnemyMagicStrength(WORD wEnemyIndex)const
 {
 	WORD wObjectID = g_Battle.rgEnemy[wEnemyIndex].wObjectID;
 	if (wEnemyIndex >= MAX_ENEMIES_IN_TEAM || wObjectID == 0)
@@ -432,7 +404,7 @@ WORD CEnemy::PAL_New_GetEnemyMagicStrength(
 
 	INT s = (SHORT)g_Battle.rgEnemy[wEnemyIndex].e.wMagicStrength;
 
-	if (ggConfig->m_Function_Set[1])//#ifdef EDIT_DAMAGE_CALC
+	if (cfgDmgFormula)//#ifdef cfgDmgFormula
 
 		s += g_Battle.rgEnemy[wEnemyIndex].e.wLevel * 7;
 	else//#else
@@ -449,9 +421,7 @@ WORD CEnemy::PAL_New_GetEnemyMagicStrength(
 	return (WORD)s;
 }
 
-WORD CEnemy::PAL_New_GetEnemyDefense(
-	WORD		wEnemyIndex
-)
+const WORD CEnemy::PAL_New_GetEnemyDefense(	WORD wEnemyIndex)const
 {
 	WORD wObjectID = g_Battle.rgEnemy[wEnemyIndex].wObjectID;
 	if (wEnemyIndex >= MAX_ENEMIES_IN_TEAM || wObjectID == 0)
@@ -461,7 +431,7 @@ WORD CEnemy::PAL_New_GetEnemyDefense(
 
 	INT s = (SHORT)g_Battle.rgEnemy[wEnemyIndex].e.wDefense;
 
-	if (ggConfig->m_Function_Set[1])//#ifdef EDIT_DAMAGE_CALC
+	if (cfgDmgFormula)//#ifdef cfgDmgFormula
 		s += g_Battle.rgEnemy[wEnemyIndex].e.wLevel * 5;
 	else //#else
 		s += (g_Battle.rgEnemy[wEnemyIndex].e.wLevel + 6) * 4;
@@ -477,23 +447,22 @@ WORD CEnemy::PAL_New_GetEnemyDefense(
 	return (WORD)s;
 }
 
-WORD CEnemy::PAL_New_GetEnemyDexterity(
-	WORD		wEnemyIndex
-)
+const DWORD CEnemy::PAL_New_GetEnemyDexterity(WORD wEnemyIndex)const
 {
-	WORD wObjectID = g_Battle.rgEnemy[wEnemyIndex].wObjectID;
-	if (wEnemyIndex >= MAX_ENEMIES_IN_TEAM || wObjectID == 0)
+	if (wEnemyIndex >= MAX_ENEMIES_IN_TEAM )
 	{
 		return 0;
 	}
 
-	INT s = (SHORT)g_Battle.rgEnemy[wEnemyIndex].e.wDexterity;
+	WORD wObjectID = g_Battle.rgEnemy[wEnemyIndex].wObjectID;
 
-	if (ggConfig->m_Function_Set[1])//#ifdef EDIT_DAMAGE_CALC
+
+	INT s = (SHORT)g_Battle.rgEnemy[wEnemyIndex].e.weDexterity;
+
+	if (cfgDmgFormula)
 		s += g_Battle.rgEnemy[wEnemyIndex].e.wLevel * 4;
-	else//#else
+	else
 		s += (g_Battle.rgEnemy[wEnemyIndex].e.wLevel + 6) * 3;
-	//#endif
 
 #ifdef FINISH_GAME_MORE_ONE_TIME
 	s += g_Battle.rgEnemy[wEnemyIndex].e.wLevel * (gpGlobals->bFinishGameTime - 1);
@@ -502,12 +471,10 @@ WORD CEnemy::PAL_New_GetEnemyDexterity(
     s = std::max(s, 0);
     s = std::min(s, 0xFFFF);
 
-	return (WORD)s;
+	return (DWORD)s;
 }
 
-WORD CEnemy::PAL_New_GetEnemyFleeRate(
-	WORD		wEnemyIndex
-)
+const WORD CEnemy::PAL_New_GetEnemyFleeRate(WORD wEnemyIndex)const
 {
 	WORD wObjectID = g_Battle.rgEnemy[wEnemyIndex].wObjectID;
 	if (wEnemyIndex >= MAX_ENEMIES_IN_TEAM || wObjectID == 0)
@@ -517,7 +484,7 @@ WORD CEnemy::PAL_New_GetEnemyFleeRate(
 
 	INT s = (SHORT)(g_Battle.rgEnemy[wEnemyIndex].e.wFleeRate);
 
-	if (ggConfig->m_Function_Set[1])//#ifdef EDIT_DAMAGE_CALC
+	if (cfgDmgFormula)//#ifdef cfgDmgFormula
 		s += g_Battle.rgEnemy[wEnemyIndex].e.wLevel * 3;
 	else//#else
 		s += (g_Battle.rgEnemy[wEnemyIndex].e.wLevel + 6) * 2;
@@ -533,9 +500,7 @@ WORD CEnemy::PAL_New_GetEnemyFleeRate(
 	return (WORD)s;
 }
 
-DWORD CEnemy::PAL_New_EstimateEnemyHealthByLevel(
-	WORD		wEnemyLevel
-)
+const DWORD CEnemy::PAL_New_EstimateEnemyHealthByLevel(	WORD wEnemyLevel)const
 {
 	DWORD dwNewHP = 0;
 
@@ -556,10 +521,8 @@ DWORD CEnemy::PAL_New_EstimateEnemyHealthByLevel(
 	return dwNewHP;
 }
 
-WORD CEnemy::PAL_GetEnemyActualDexterity(
-	WORD			wEnemyIndex
-)
+const DWORD CEnemy::PAL_GetEnemyActualDexterity(WORD wEnemyIndex)const
 {
-	WORD wDexterity = PAL_New_GetEnemyDexterity(wEnemyIndex);
+	DWORD wDexterity = PAL_New_GetEnemyDexterity(wEnemyIndex);
 	return wDexterity;
 }

@@ -14,6 +14,7 @@
 #define   FONT_COLOR_CYAN_ALT       0x8C
 #define   CHUNKNUM_SPRITEUI                  9
 
+using ByteArray = std::vector<unsigned char>;
 class SFILES
 {
 public:
@@ -36,47 +37,38 @@ public:
 };
 
 // game data which is available in data files.
-struct SGAMEDATA
+class SGAMEDATA
 {
-	//LPEVENTOBJECT           lprgEventObject{};
+public:
 	std::vector<EVENTOBJECT> lprgEventObject{}; //事件对象
 	int                     nEventObject{};
 
-	//SCENE                   rgScene[MAX_SCENES]{};
 	std::vector<SCENE>      rgScene{}; //场景数据
 	int						nScene{};
 
-	//LPOBJECT                rgObject{};
 	std::vector<OBJECT>		rgObject{}; //对象数据
 	int						nObject{};
 
-	//LPSCRIPTENTRY           lprgScriptEntry{};
 	std::vector<SCRIPTENTRY> lprgScriptEntry{}; //脚本数据
 	int                     nScriptEntry{};
 
-	//LPSTORE                 lprgStore{};
 	std::vector<STORE>		lprgStore{}; //商店数据
 	int                     nStore{};
 
-	//LPENEMY                 lprgEnemy{};
 	std::vector<ENEMY>		lprgEnemy{}; //敌人数据
 	int                     nEnemy{};
 
-	//LPENEMYTEAM             lprgEnemyTeam{};
 	std::vector<ENEMYTEAM>  lprgEnemyTeam{}; //敌人队伍数据
 	int                     nEnemyTeam{};
 
 	PLAYERROLES             PlayerRoles{};
 
-	//LPMAGIC                 lprgMagic{};
 	std::vector<MAGIC>      lprgMagic{}; //魔法数据
 	int                     nMagic{};
 
-	//LPBATTLEFIELD           lprgBattleField{};
 	std::vector<BATTLEFIELD> lprgBattleField{}; //战斗场景数据
 	int                     nBattleField{};
 
-	//LPLEVELUPMAGIC_ALL      lprgLevelUpMagic{};
 	std::vector<LEVELUPMAGIC_ALL> lprgLevelUpMagic{}; //升级魔法数据
 	int                     nLevelUpMagic{};
 
@@ -94,11 +86,12 @@ public:
 	SFILES f{};
 	SGAMEDATA g{};
 	TEXTLIB				g_TextLib{};
-	LPSPRITE			gpSpriteUI{};
-	class CConfig*		gConfig{}; 
+	ByteArray			gpSpriteUI{};
+	class CConfig		gConfig{}; 
 	std::string			PalDir;
 	std::vector< ByteArray>	rgSaveData;//0--maxSave
-	int					rgSaveDataChaged[MAXSAVEFILES]{};
+	std::vector<int>		rgSaveDataChaged;
+
 
 	int 			 isErr{};
 	int              iCurMainMenuItem{};    // current main menu item number
@@ -112,7 +105,7 @@ public:
 	BOOL             fInBattle{};           // TRUE if in battle
 	BOOL             fAutoBattle{};         // TRUE if auto-battle
 
-	BYTE             bBattleSpeed{};        // Battle Speed (1 = Fastest, 5 = Slowest)
+	BYTE             bBattleSpeed{2};        // Battle Speed (1 = Fastest, 5 = Slowest)
 
 	WORD             wLastUnequippedItem{}; // last unequipped item
 
@@ -144,7 +137,7 @@ public:
 	ALLEXPERIENCE    Exp{};                 // experience status
 	POISONSTATUS     rgPoisonStatus[MAX_POISONS][MAX_PLAYABLE_PLAYER_ROLES]{}; // poison status
 	INVENTORY        rgInventory[MAX_INVENTORY]{};  // inventory status
-	LPOBJECTDESC     lpObjectDesc{};
+	OBJECTDESC       rgObjectDesc{};
 	DWORD            dwFrameNum{};
 
 	/////////
@@ -158,6 +151,11 @@ public:
 	CPalData() = delete;
 	CPalData(const std::string& dir,const CPalData* pf = nullptr );
 	~CPalData();
+	// 显式默认拷贝构造和赋值（推荐）
+	CPalData(const CPalData& other) = default;
+	CPalData& operator=(const CPalData& other) = default;
+
+public:
 	PalErr loadAllData(const std::string& dir, const CPalData* pf);
 	
 	static ByteArray readAll(const std::string& fileName);
@@ -169,11 +167,8 @@ public:
 	static BOOL IsFileExist(const std::string& csFile);
 	// 判断文件是否存在
 	static BOOL IsDirExist(const std::string& csFile);
-
-	static int pByteToInt(LPCBYTE p) {
-		return (int)(p[0] +
-			(p[1] << 8) + (p[2] << 16) + (p[3] << 24));
-	}
+	// 将内存指针转化为整数，没有涉及大小端
+	static int pByteToInt(LPCBYTE p);
 	static int PAL_MKFReadChunk(LPBYTE lpBuffer, UINT  uiBufferSize, UINT  uiChunkNum, const ByteArray& fp);;
 	static ByteArray PAL_MKFReadChunk(UINT  uiChunkNum, const ByteArray& fp);
 
@@ -190,7 +185,6 @@ private:
 	static PalErr YJ2_Decompress(LPCVOID Source, LPVOID Destination, INT DestSize);
 
 public:	
-	#define  RangeValues(val,mix,max) {if(val<(mix))val=(mix);else if(val>(max))val=(max);} 
 	
 	PalErr loadConfig();
 	INT PAL_IsPalWIN();
@@ -253,7 +247,7 @@ public:
 	//取对象结构在存储文件中的位移 0 对象，2 场景 1 场景对象
 	const size_t getSaveFileOffset(int ob)const;
 
-	LPOBJECTDESC PAL_LoadObjectDesc();
+	OBJECTDESC PAL_LoadObjectDesc();
 
 	LPWORD getSaveFileObject(int ob, int row, int col, ByteArray& fp);
 
@@ -270,7 +264,7 @@ private:
 
 		VOID PAL_FreeText();
 		//释放说明
-		VOID PAL_FreeObjectDesc(LPOBJECTDESC   lpObjectDesc);
+		VOID PAL_FreeObjectDesc(OBJECTDESC   rgObjectDesc);
 		//加载对象
 		template<typename T>
 		PalErr Pal_LoadObject(std::vector<T>& data,int &len, int n, ByteArray& fp);

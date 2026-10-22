@@ -68,7 +68,6 @@ VOID CScene::PAL_AddSpriteToDraw(
 	s.pos = PAL_XY(x, y);
 	s.iLayer = iLayer;
 	g_rgSpriteToDraw.push_back(s);
-	//g_nSpriteToDraw++;
 }
 
 VOID CScene::PAL_CalcCoverTiles(SPRITE_TO_DRAW* lpSpriteToDraw
@@ -191,10 +190,12 @@ INT CScene::PAL_SceneDrawSprites(
 
    --*/
 {
-	int i, x, y, vy;
+	//int i, x, y, vy;
 
 	g_rgSpriteToDraw.clear();
+
 	PalSurface smSurf(gpPalette, PictureWidth, PictureHeight);
+	
 	auto mSurf = smSurf.get();
 	//
 	// Put all the sprites to be drawn into our array.
@@ -203,7 +204,7 @@ INT CScene::PAL_SceneDrawSprites(
 	//
 	// Players
 	//
-	for (i = 0; i <= (short)gpGlobals->wMaxPartyMemberIndex + gpGlobals->nFollower; i++)
+	for (int i = 0; i <= (short)gpGlobals->wMaxPartyMemberIndex + gpGlobals->nFollower; i++)
 	{
 		LPCBITMAPRLE lpBitmap =
 			PAL_SpriteGetFrame(PAL_GetPlayerSprite((BYTE)i), gpGlobals->rgParty[i].wFrame);
@@ -230,18 +231,18 @@ INT CScene::PAL_SceneDrawSprites(
 	//
 	// Event Objects (Monsters/NPCs/others)
 	//
-	for (i = gpGlobals->g.rgScene[gpGlobals->wNumScene - 1].wEventObjectIndex;
+	for (int i = gpGlobals->g.rgScene[gpGlobals->wNumScene - 1].wEventObjectIndex;
 		i < gpGlobals->g.rgScene[gpGlobals->wNumScene].wEventObjectIndex; i++)
 	{
-		LPCBITMAPRLE     lpFrame;
-		LPCSPRITE        lpSprite;
+		//LPCBITMAPRLE     lpFrame;
+		//LPCSPRITE        lpSprite;
 
-		LPEVENTOBJECT    lpEvtObj = &(gpGlobals->g.lprgEventObject[i]);
+		auto &mEvtObj = (gpGlobals->g.lprgEventObject[i]);
 
 		int              iFrame;
 
-		if (lpEvtObj->sState == kObjStateHidden || lpEvtObj->sVanishTime > 0 ||
-			lpEvtObj->sState < 0)
+		if (mEvtObj.sState == kObjStateHidden || mEvtObj.sVanishTime > 0 ||
+			mEvtObj.sState < 0)
 		{
 			continue;
 		}
@@ -249,14 +250,16 @@ INT CScene::PAL_SceneDrawSprites(
 		//
 		// Get the sprite
 		//
-		lpSprite = PAL_GetEventObjectSprite((WORD)i + 1);
-		if (lpSprite == NULL)
+		auto& lpSprite = gpResources->lppEventObjectSprites[i - 
+			gpGlobals->g.rgScene[gpGlobals->wNumScene - 1].wEventObjectIndex];
+		//auto lpSprite = PAL_GetEventObjectSprite((WORD)i + 1);
+		if (lpSprite.empty())
 		{
 			continue;
 		}
 
-		iFrame = lpEvtObj->wCurrentFrameNum;
-		if (lpEvtObj->nSpriteFrames == 3)
+		iFrame = mEvtObj.wCurrentFrameNum;
+		if (mEvtObj.nSpriteFrames == 3)
 		{
 			//
 			// walking character
@@ -272,8 +275,8 @@ INT CScene::PAL_SceneDrawSprites(
 			}
 		}
 
-		lpFrame = PAL_SpriteGetFrame(lpSprite,
-			lpEvtObj->wDirection * lpEvtObj->nSpriteFrames + iFrame);
+		auto lpFrame = PAL_SpriteGetFrame(lpSprite,
+			mEvtObj.wDirection * mEvtObj.nSpriteFrames + iFrame);
 
 		if (lpFrame == NULL)
 		{
@@ -283,7 +286,7 @@ INT CScene::PAL_SceneDrawSprites(
 		//
 		// Calculate the coordinate and check if outside the screen
 		//
-		x = (SHORT)lpEvtObj->x - PAL_X(gpGlobals->viewport);
+		int x = (SHORT)mEvtObj.x - PAL_X(gpGlobals->viewport);
 		x -= PAL_RLEGetWidth(lpFrame) / 2;
 
 
@@ -295,10 +298,10 @@ INT CScene::PAL_SceneDrawSprites(
 			continue;
 		}
 
-		y = (SHORT)lpEvtObj->y - PAL_Y(gpGlobals->viewport);
-		y += lpEvtObj->sLayer * 8 + 9;
+		int y = (SHORT)mEvtObj.y - PAL_Y(gpGlobals->viewport);
+		y += mEvtObj.sLayer * 8 + 9;
 
-		vy = y - PAL_RLEGetHeight(lpFrame) - lpEvtObj->sLayer * 8 + 2;
+		int vy = y - PAL_RLEGetHeight(lpFrame) - mEvtObj.sLayer * 8 + 2;
 		if (vy >= 200 || vy < -(int)PAL_RLEGetHeight(lpFrame))
 		{
 			//
@@ -310,7 +313,7 @@ INT CScene::PAL_SceneDrawSprites(
 		//
 		// Add it into the array
 		//
-		PAL_AddSpriteToDraw(lpFrame, x, y, lpEvtObj->sLayer * 8 + 2);
+		PAL_AddSpriteToDraw(lpFrame, x, y, mEvtObj.sLayer * 8 + 2);
 
 		//
 		// Calculate covering map tiles
@@ -321,7 +324,7 @@ INT CScene::PAL_SceneDrawSprites(
 	//
 	// All sprites are now in our array; sort them by their vertical positions.
 	//
-	//排序
+	//
 	sort(g_rgSpriteToDraw.begin(), g_rgSpriteToDraw.end(), 
 		[](SPRITE_TO_DRAW& a, SPRITE_TO_DRAW& b)->BOOL {return PAL_Y(a.pos) < PAL_Y(b.pos); });
 
@@ -329,12 +332,12 @@ INT CScene::PAL_SceneDrawSprites(
 	//
 	// Draw all the sprites to the screen.
 	//
-	for (i = 0; i < g_rgSpriteToDraw.size(); i++)
+	for (int i = 0; i < g_rgSpriteToDraw.size(); i++)
 	{
 		SPRITE_TO_DRAW* p = &g_rgSpriteToDraw[i];
 
-		x = PAL_X(p->pos);
-		y = PAL_Y(p->pos) - PAL_RLEGetHeight(p->lpSpriteFrame) - p->iLayer;
+		int x = PAL_X(p->pos);
+		int y = PAL_Y(p->pos) - PAL_RLEGetHeight(p->lpSpriteFrame) - p->iLayer;
 
 		PAL_RLEBlitToSurface(p->lpSpriteFrame, mSurf, PAL_XY(x, y), 0, 0);
 	}
@@ -346,16 +349,15 @@ INT CScene::PAL_SceneDrawSprites(
 
 VOID CScene::PAL_Drow_Object(VOID)
 {
-	int i;// , x, y, vy;
 
 	auto & gpSpriteUI = gpGlobals->gpSpriteUI;
 	//
 	// Event Objects (Monsters/NPCs/others)
 	//
-	for (i = gpGlobals->g.rgScene[gpGlobals->wNumScene - 1].wEventObjectIndex;
+	for (int i = gpGlobals->g.rgScene[gpGlobals->wNumScene - 1].wEventObjectIndex;
 		i < gpGlobals->g.rgScene[gpGlobals->wNumScene].wEventObjectIndex; i++)
 	{
-		LPEVENTOBJECT    lpEvtObj = &(gpGlobals->g.lprgEventObject[i]);
+		auto  lpEvtObj = &gpGlobals->g.lprgEventObject.at(i);
 
 		if (lpEvtObj->sState == kObjStateHidden ||
 			lpEvtObj->sState < 0)

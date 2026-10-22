@@ -149,13 +149,13 @@ private:
     void OGG_FillResample(ogg_int16_t* stream);
     BOOL OGG_Rewind();
 
-    ogg_sync_state   oy; /* sync and verify incoming physical bitstream */
-    ogg_stream_state os; /* take physical pages, weld into a logical stream of packets */
-    ogg_page         og; /* one Ogg bitstream page. Vorbis packets are inside */
-    vorbis_info      vi; /* struct that stores all the static vorbis bitstream settings */
-    vorbis_comment   vc; /* struct that stores all the bitstream user comments */
-    vorbis_dsp_state vd; /* central working state for the packet->PCM decoder */
-    vorbis_block     vb; /* local working space for packet->PCM decode */
+    ogg_sync_state   oy{}; /* sync and verify incoming physical bitstream */
+    ogg_stream_state os{}; /* take physical pages, weld into a logical stream of packets */
+    ogg_page         og{}; /* one Ogg bitstream page. Vorbis packets are inside */
+    vorbis_info      vi{}; /* struct that stores all the static vorbis bitstream settings */
+    vorbis_comment   vc{}; /* struct that stores all the bitstream user comments */
+    vorbis_dsp_state vd{}; /* central working state for the packet->PCM decoder */
+    vorbis_block     vb{}; /* local working space for packet->PCM decode */
 
     FILE* fp{};
     void* resampler[2]{};

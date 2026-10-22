@@ -102,7 +102,7 @@ CScript::CScript(int save, BOOL noRun,const CPalData* pf )
 
 	if (save > 0)
 		gpGlobals->PAL_LoadGame(gpGlobals->rgSaveData.at(
-			save - ggConfig->m_Function_Set[53]));
+			save - cfgAutoSave));
 	else if (save < 0)
 	{
 		gpGlobals->PAL_LoadGame(gpGlobals->rgSaveData.at(-save));
@@ -112,13 +112,14 @@ CScript::CScript(int save, BOOL noRun,const CPalData* pf )
 	}
 	else
 		gpGlobals->PAL_LoadDefaultGame();
+	
 	PAL_GetPalette(0, 0);
 
 	if (noRun)
 	{
 		PalQuit = TRUE;//不运行游戏循环
-		if ((!ggConfig->fIsWIN95) && (!gpGlobals->lpObjectDesc))
-			gpGlobals->lpObjectDesc = gpGlobals->PAL_LoadObjectDesc();
+		if ((!cfgIsWin95) && (gpGlobals->rgObjectDesc.size()))
+			gpGlobals->rgObjectDesc = gpGlobals->PAL_LoadObjectDesc();
 		return;
 	}
 	//运行游戏循环
@@ -153,7 +154,6 @@ WORD CScript::PAL_InterpretInstruction(
 	WORD				w, wCurEventObjectID;
 	WORD				wPlayerRole;
 
-	//auto &gConfig = gpGlobals->gConfig;
 	pScript = &(gpGlobals->g.lprgScriptEntry[wScriptEntry]);
 
 	if (wEventObjectID != 0)
@@ -890,7 +890,7 @@ WORD CScript::PAL_InterpretInstruction(
 		}
 
 		//#ifdef ADD_SOME_POISONS_SUCCESSFULLY_ANYTIME //某些毒可以对任何人均命中（无视敌方巫抗或我方毒抗）
-		if (ggConfig->m_Function_Set[18])
+		if (cfgPoisonPierce)
 			if (pScript->rgwOperand[2] == 0xffff
 				|| gpGlobals->g.rgObject[pScript->rgwOperand[1]].poison.wPoisonLevel >= 99)
 			{
@@ -963,7 +963,7 @@ WORD CScript::PAL_InterpretInstruction(
 
 //#ifdef ADD_SOME_POISONS_SUCCESSFULLY_ANYTIME 
 //某些毒可以对任何人均命中（无视敌方巫抗或我方毒抗）
-		if(ggConfig->m_Function_Set[18])
+		if(cfgPoisonPierce)
 			if (pScript->rgwOperand[2] == 0xffff || 
 				gpGlobals->g.rgObject
 				[pScript->rgwOperand[1]].poison.wPoisonLevel >= 99)
@@ -1138,8 +1138,8 @@ WORD CScript::PAL_InterpretInstruction(
 		WORD wStatusID = pScript->rgwOperand[0];
 		WORD wNumRound = pScript->rgwOperand[1];
 
-//#ifdef ADD_SOME_STATUSES_SUCCESSFULLY_ANYTIME
-		if(ggConfig->m_Function_Set[6])
+//#ifdef cfgStatusNoResist
+		if(cfgStatusNoResist)
 		if (wStatusID >= 4 || pScript->rgwOperand[2] == 0xffff)	//有益状态总是成功
 		{
 			fAlwaysSuccess = TRUE;
@@ -1198,16 +1198,16 @@ WORD CScript::PAL_InterpretInstruction(
 		if (g_Battle.fPlayerMoving)
 		{
 			wPlayerRole = gpGlobals->rgParty[g_Battle.wMovingPlayerIndex].wPlayerRole;
-			wPlayerRole = PAL_NEW_CheckAndGetLegalPlayerTarget(wPlayerRole);	//如果
+			wPlayerRole = PAL_NEW_CheckAndGetLegalPlayerTarget(wPlayerRole);	
 			wBaseSuccessRate += PAL_New_GetPlayerSorceryStrength(wPlayerRole);//巫攻越高设置状态成功率越高
 		}
 
-#ifdef ADD_SOME_STATUSES_SUCCESSFULLY_ANYTIME
-		if(ggConfig->m_Function_Set[6])
-		if (pScript->rgwOperand[2] == 0xffff)
-		{
-			fAlwaysSuccess = TRUE;
-		}
+#ifdef cfgStatusNoResist
+		if(cfgStatusNoResist)
+			if (pScript->rgwOperand[2] == 0xffff)
+			{
+				fAlwaysSuccess = TRUE;
+			}
 #endif
 		iSuccessRate = wBaseSuccessRate - wSorceryResistance;
 		if (fAlwaysSuccess || !fSorceryIsFull && PAL_New_GetTrueByPercentage(iSuccessRate))
@@ -1310,7 +1310,7 @@ WORD CScript::PAL_InterpretInstruction(
 		*/
 	{
 //#ifdef  New_EDIT_SCRIPT_OPERATION_0X0034
-		if (ggConfig->m_Function_Set[4])
+		if (cfgGourdToShop)
 		{
 			PAL_BuyMenu(0);
 			break;
@@ -1775,7 +1775,8 @@ WORD CScript::PAL_InterpretInstruction(
 	// Hide for a while
 	case 0x005C:
 	{
-		g_Battle.iHidingTime = (INT)(pScript->rgwOperand[0]);
+		//g_Battle.iHidingTime = (INT)(pScript->rgwOperand[0]);
+		PAL_SetHidingTime((INT)(pScript->rgwOperand[0]));
 		break;
 	}
 
@@ -1810,7 +1811,7 @@ WORD CScript::PAL_InterpretInstruction(
 		else
 		{
 			gpGlobals->g.PlayerRoles.rgwHP[wEventObjectID] = 0;
-			g_Battle.rgPlayer[wEventObjectID].fNotKillImmediately = ggConfig->m_Function_Set[10];
+			g_Battle.rgPlayer[wEventObjectID].fNotKillImmediately = cfgSnatchCD;
 		}
 		gpGlobals->Exp.rgFleeExp[wEventObjectID].wCount += RandomLong(1, 2);
 
@@ -1885,9 +1886,10 @@ WORD CScript::PAL_InterpretInstruction(
 			wBaseDamage += gpGlobals->g.PlayerRoles.rgwAttackStrength[wPlayerRole];
 			wBaseDamage += PAL_GetPlayerAttackStrength(wPlayerRole);
 			/////
-			if (ggConfig->m_Function_Set[20])
+			if (cfgTiangangThrow)
 			{
-				if (g_Battle.rgPlayer[g_Battle.wMovingPlayerIndex].action.ActionType == kBattleActionThrowItem)
+				if (g_Battle.rgPlayer[g_Battle.wMovingPlayerIndex].action.ActionType == 
+					BATTLEACTIONTYPE::kBattleActionThrowItem)
 					if (gpGlobals->rgPlayerStatus[wPlayerRole][kStatusBravery] && wBaseDamage > 50)
 						wBaseDamage *= 3;
 			}
@@ -2077,7 +2079,7 @@ WORD CScript::PAL_InterpretInstruction(
 					pScript->rgwOperand[i] - 1;
 
 				g_Battle.rgPlayer[gpGlobals->wMaxPartyMemberIndex].action.ActionType =
-					kBattleActionAttack;
+					BATTLEACTIONTYPE::kBattleActionAttack;
 
 				gpGlobals->wMaxPartyMemberIndex++;
 			}
@@ -2113,7 +2115,7 @@ WORD CScript::PAL_InterpretInstruction(
 		PAL_EndingSetEffectSprite(0);
 		PAL_ShowFBP(pScript->rgwOperand[0], pScript->rgwOperand[1]);
 #endif*/
-		if (ggConfig->fIsWIN95)
+		if (cfgIsWin95)
 		{
 			//SDL_FillRect(gpScreen, NULL, 0);
 			VIDEO_UpdateScreen(gpTextureReal);
@@ -2251,7 +2253,7 @@ WORD CScript::PAL_InterpretInstruction(
 			x = (SHORT)(pScript->rgwOperand[0]);
 			y = (SHORT)(pScript->rgwOperand[1]);
 
-			time = SDL_GetTicks_New() + ggConfig->m_Function_Set[24];
+			time = SDL_GetTicks_New() + CConfig::cfgBtlFrameMs;
 
 			do
 			{
@@ -2303,7 +2305,7 @@ WORD CScript::PAL_InterpretInstruction(
 					PAL_ProcessEvent();
 					SDL_Delay(1);
 				}
-				time = SDL_GetTicks_New() + ggConfig->m_Function_Set[24];
+				time = SDL_GetTicks_New() + cfgBtlFrameMs;
 			} while (++i < (SHORT)(pScript->rgwOperand[2]));
 		}
 		break;
@@ -2650,7 +2652,7 @@ WORD CScript::PAL_InterpretInstruction(
 	case 0x0096:
 	{
 //#ifndef PAL_WIN95
-		if(!ggConfig->fIsWIN95)
+		if(!cfgIsWin95)
 			PAL_NEW_EndingScreen1();
 		//PAL_EndingAnimation();
 //#endif
@@ -2765,16 +2767,14 @@ WORD CScript::PAL_InterpretInstruction(
 			{
 				w--;
 				//需要释放图像
-				if (g_Battle.rgEnemy[i].lpSprite)
-					free(g_Battle.rgEnemy[i].lpSprite);
-
-				memset(&(g_Battle.rgEnemy[i]), 0, sizeof(BATTLEENEMY));
-
+				//g_Battle.rgEnemy[i].lpSprite.clear();
+				//memset(&(g_Battle.rgEnemy[i]), 0, sizeof(BATTLEENEMY) - sizeof(ByteArray));
+				g_Battle.rgEnemy[i].clear();
 				g_Battle.rgEnemy[i].wObjectID = g_Battle.rgEnemy[wEventObjectID].wObjectID;
 				g_Battle.rgEnemy[i].e = g_Battle.rgEnemy[wEventObjectID].e;
 				g_Battle.rgEnemy[i].dwMaxHealth = g_Battle.rgEnemy[wEventObjectID].dwMaxHealth;
 				
-				if (ggConfig->m_Function_Set[26])//分裂的怪物血量为原来的一半
+				if (cfgSplitHPHalf)//分裂的怪物血量为原来的一半
 					g_Battle.rgEnemy[wEventObjectID].dwActualHealth /=2;
 				
 				g_Battle.rgEnemy[i].dwActualHealth = g_Battle.rgEnemy[wEventObjectID].dwActualHealth;
@@ -2785,8 +2785,7 @@ WORD CScript::PAL_InterpretInstruction(
 				g_Battle.rgEnemy[i].wScriptOnBattleEnd = g_Battle.rgEnemy[wEventObjectID].wScriptOnBattleEnd;
 				g_Battle.rgEnemy[i].wScriptOnReady = g_Battle.rgEnemy[wEventObjectID].wScriptOnReady;
 
-				g_Battle.rgEnemy[i].state = kFighterWait;
-				g_Battle.rgEnemy[i].flTimeMeter = 50;
+				g_Battle.rgEnemy[i].state = FIGHTERSTATE::kFighterWait;
 				g_Battle.rgEnemy[i].iColorShift = 0;
 			}
 		}
@@ -2854,24 +2853,20 @@ WORD CScript::PAL_InterpretInstruction(
 				if (g_Battle.rgEnemy[i].wObjectID == 0)
 				{
 					//需要释放图像
-					if (g_Battle.rgEnemy[i].lpSprite)
-						free(g_Battle.rgEnemy[i].lpSprite);
-					memset(&(g_Battle.rgEnemy[i]), 0, sizeof(BATTLEENEMY));
-
+					//g_Battle.rgEnemy[i].lpSprite.clear();
+					//memset(&(g_Battle.rgEnemy[i]), 0, sizeof(BATTLEENEMY) - sizeof(ByteArray));
+					g_Battle.rgEnemy[i].clear();
 					g_Battle.rgEnemy[i].wObjectID = wNewEnemyID;
 					g_Battle.rgEnemy[i].e = gpGlobals->g.lprgEnemy[gpGlobals->g.rgObject[wNewEnemyID].enemy.wEnemyID];
 					g_Battle.rgEnemy[i].dwMaxHealth = g_Battle.rgEnemy[i].e.wHealth;
 					g_Battle.rgEnemy[i].dwActualHealth = g_Battle.rgEnemy[i].e.wHealth;
 					g_Battle.rgEnemy[i].dwExp = g_Battle.rgEnemy[i].e.wExps;
-//#ifdef STRENGTHEN_ENEMY
-					if (ggConfig->m_Function_Set[3])
+					if (cfgBuffEarlyFoe)
 						g_Battle.rgEnemy[i] = PAL_New_StrengthenEnemy(g_Battle.rgEnemy[i]);
-//#endif
-					g_Battle.rgEnemy[i].state = kFighterWait;
+					g_Battle.rgEnemy[i].state = FIGHTERSTATE::kFighterWait;
 					g_Battle.rgEnemy[i].wScriptOnTurnStart = gpGlobals->g.rgObject[wNewEnemyID].enemy.wScriptOnTurnStart;
 					g_Battle.rgEnemy[i].wScriptOnBattleEnd = gpGlobals->g.rgObject[wNewEnemyID].enemy.wScriptOnBattleEnd;
 					g_Battle.rgEnemy[i].wScriptOnReady = gpGlobals->g.rgObject[wNewEnemyID].enemy.wScriptOnReady;
-					g_Battle.rgEnemy[i].flTimeMeter = 50;
 					g_Battle.rgEnemy[i].iColorShift = 8;
 
 					wNewEnemyNum--;
@@ -2948,7 +2943,7 @@ WORD CScript::PAL_InterpretInstruction(
 	// Quit game
 	case 0x00A0:
 	{
-		if (ggConfig->fIsWIN95)
+		if (cfgIsWin95)
 			PAL_EndingScreen();
 		PalQuit = TRUE;
 		break;
@@ -2994,7 +2989,7 @@ WORD CScript::PAL_InterpretInstruction(
 	case 0x00A4:
 	{
 		//#ifndef PAL_WIN95
-		if (!ggConfig->fIsWIN95)
+		if (!cfgIsWin95)
 			if (pScript->rgwOperand[0] == 68)
 			{
 				//
@@ -3015,7 +3010,7 @@ WORD CScript::PAL_InterpretInstruction(
 	case 0x00A5:
 	{
 //#ifndef PAL_WIN95
-		if (!ggConfig->fIsWIN95)
+		if (!cfgIsWin95)
 		{
 			if (pScript->rgwOperand[1] != 0xFFFF)
 			{
@@ -3040,7 +3035,7 @@ WORD CScript::PAL_InterpretInstruction(
 	case 0x00B0:
 	{
 //#ifdef PAL_HAS_AVI
-		if (ggConfig->fEnableAviPlay)
+		if (cfgUseAVI)
 			if (gpGlobals->IsFileExist(va("%s/avi/4.AVI", PalDir.c_str())) && gpGlobals->IsFileExist(va("%s/avi/5.AVI", PalDir.c_str())))
 			{
 				CAviPlay m;
@@ -3062,7 +3057,7 @@ WORD CScript::PAL_InterpretInstruction(
 	case 0x00B1:
 	{
 //#ifdef PAL_HAS_AVI
-		if (ggConfig->fEnableAviPlay) {
+		if (cfgUseAVI) {
 			CAviPlay m;
 			if (!m.PAL_PlayAVI(va("%s/avi/6.AVI", PalDir.c_str())))
 				PAL_NEW_EndingScreen2();
@@ -3105,7 +3100,7 @@ WORD CScript::PAL_InterpretInstruction(
 					pScript->rgwOperand[i] - 1;
 
 				g_Battle.rgPlayer[gpGlobals->wMaxPartyMemberIndex].action.ActionType =
-					kBattleActionAttack;
+					BATTLEACTIONTYPE::kBattleActionAttack;
 			}
 		}
 		//
@@ -3140,7 +3135,7 @@ WORD CScript::PAL_InterpretInstruction(
 			if (pScript->rgwOperand[0] & (1 << i) && gpGlobals->wMaxPartyMemberIndex < MAX_PLAYERS_IN_PARTY)
 			{
 				gpGlobals->rgParty[gpGlobals->wMaxPartyMemberIndex].wPlayerRole = i;
-				g_Battle.rgPlayer[gpGlobals->wMaxPartyMemberIndex].action.ActionType = kBattleActionAttack;
+				g_Battle.rgPlayer[gpGlobals->wMaxPartyMemberIndex].action.ActionType = BATTLEACTIONTYPE::kBattleActionAttack;
 				gpGlobals->wMaxPartyMemberIndex++;
 			}
 		}
@@ -3339,7 +3334,7 @@ begin:
 
 	case 0xFFFF:
 //#ifdef PAL_WIN95
-		if (ggConfig->fIsWIN95)
+		if (cfgIsWin95)
 		{
 			int XBase = (wEventObjectID & PAL_ITEM_DESC_BOTTOM) ? 71 : 102;
 			int YBase = (wEventObjectID & PAL_ITEM_DESC_BOTTOM) ? 151  : 3;
@@ -3616,7 +3611,7 @@ WORD CScript::PAL_RunTriggerScript(WORD wScriptEntry, WORD wEventObjectID
 
 			PAL_ClearDialog(TRUE);
 
-			time = SDL_GetTicks_New() + ggConfig->m_Function_Set[24];
+			time = SDL_GetTicks_New() + cfgBtlFrameMs;
 
 			for (i = 0; i < (pScript->rgwOperand[0] ? pScript->rgwOperand[0] : 1); i++)
 			{
@@ -3627,7 +3622,7 @@ WORD CScript::PAL_RunTriggerScript(WORD wScriptEntry, WORD wEventObjectID
 					SDL_Delay(1);
 				}
 
-				time = SDL_GetTicks_New() + ggConfig->m_Function_Set[24];
+				time = SDL_GetTicks_New() + cfgBtlFrameMs;
 
 				if (pScript->rgwOperand[2])
 				{
@@ -3818,7 +3813,7 @@ VOID CScript::PAL_PartyRideEventObject(
 			SDL_Delay(1);
 		}
 
-		t = SDL_GetTicks_New() + ggConfig->m_Function_Set[24];
+		t = SDL_GetTicks_New() + cfgBtlFrameMs;
 
 		if (yOffset < 0)
 		{
@@ -3907,7 +3902,7 @@ VOID CScript::PAL_PaletteFade(
 	PAL_MakeScene();
 	for (int i = 0; i < 32; i++)
 	{
-		DWORD time = SDL_GetTicks_New() + (fUpdateScene ? ggConfig->m_Function_Set[24] : ggConfig->m_Function_Set[24] / 4);
+		DWORD time = SDL_GetTicks_New() + (fUpdateScene ? cfgBtlFrameMs : cfgBtlFrameMs / 4);
 		if (fUpdateScene)
 		{
 			PAL_ClearKeyState();
@@ -4690,7 +4685,7 @@ VOID CScript::runGame()
 	PAL_GetPalette(0, 0);
 	
 	DWORD dwTime = SDL_GetTicks_New();
-	gpGlobals->fGameStart = 1;
+	gpGlobals->fGameStart = TRUE;
 	PAL_ProcessEvent();
 	setPrevdirEction(kDirUnknown);
 	setDirEction(kDirUnknown);
@@ -4724,8 +4719,9 @@ VOID CScript::runGame()
 	} while (FALSE);
 
 	//等待声音进程结束
-	while (PalSoundIn)
+	while (PalSoundIn )
 		PAL_Delay(1);
+
 	//关闭视频系统
 	VideoShutDown();
 	isRunEnd = 1;

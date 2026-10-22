@@ -333,7 +333,7 @@ DWORD CPixEdit::FindTileCoor(int dx, int dy, int& sx, int& sy, int& sh)
         sy = y, sx = x, sh = h;
     if (x >= 0 && y >= 0)
     {
-        return m_Pal->m_pPalMap->MapTiles[y][x][h];
+        return m_Pal->pal->gpResources->lpMap->MapTiles[y][x][h];
     }
     return 0;
 }
@@ -426,7 +426,7 @@ VOID CPixEdit::DrawObstacles(QImage& m, const PAL_Rect* lpSrcRect)
                 //
                 if (x >= 64 || y >= 128 || h > 1 || x < 0 || y < 0)
                     continue;
-                uint32_t l = m_Pal->m_pPalMap->MapTiles[y][x][h];
+                uint32_t l = m_Pal->pal->gpResources->lpMap->MapTiles[y][x][h];
                 if (l & 0x2000)
                 {
                     //用白笔画

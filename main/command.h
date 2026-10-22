@@ -12,47 +12,37 @@
 
 using ByteArray = std::vector<unsigned char>;
 
-#define MAXSAVEFILES    30
+#define MAXSAVEFILES    50
+#define SAVEFILES       (cfgMaxSaves + cfgAutoSave)
 #define PalErr          int         //标识为PalErr的函数返回非零为出错
 #define CP_ACP          0           // default to ANSI code page
 #define PAL_XY(x, y)    (PAL_POS)(((((WORD)(y)) << 16) & 0xFFFF0000) | (((WORD)(x)) & 0xFFFF))
 #define PAL_X(xy)       (SHORT)((xy) & 0xFFFF)
 #define PAL_Y(xy)       (SHORT)(((xy) >> 16) & 0xFFFF)
 
-#define         FPS             10
-#define         FRAME_TIME      (1000 / FPS)
-#define         BATTLE_FPS               40
-#define         BATTLE_FRAME_TIME        (1000 / BATTLE_FPS)
+//#define         FPS             10
+//#define         cfgBtlFrameMs      (1000 / FPS)
+//#define         BATTLE_FPS               40
+//#define         cfgBtlFrameMs        (1000 / BATTLE_FPS)
 
 #define MAX_PARAMETER						32000	//武术、灵力、防御、身法、吉运、体力、真气的最大值，默认为999
 #define MAX_PARAMETER_EXTRA					100		//属性值的最大额外值，战前检测，使用物品后检测。
-#define POISON_STATUS_EXPAND // 增加毒的烈度
 
 #define ENEMY_MAX_MOVE						3		//敌人最多行动次数，如果为2则是经典版
 #define MAX_POISON_LEVEL					99		//复活后解除的毒的最高等级；99一般为装备技能，如寿葫芦
-#define EDIT_DAMAGE_CALC					1		//修改伤害计算公式（包括敌人的属性计算方式）
 #define MAX_DAMAGE							32000	//最大伤害值
-//#define SHOW_DATA_IN_BATTLE                 1       //在战斗中显示相关数据
 #define SHOW_ENEMY_STATUS                   1       //在战斗中查看敌方数据
 #define DWORD_EXP                           1       //经验值用DWORD
 #define NEW_ScriptOnBattleEnd               1       //修改被覆盖的战后脚本
 #define FINISH_GAME_MORE_ONE_TIME           1       // 
 
 #define DONOT_SELECT_TARGET_RANDOMLY_TOTALLY        //不完全是随机选择目标
-#define STRENGTHEN_ENEMY							//在后期加强前期的敌人、队伍多于3人，敌人加强
 
-#define EDIT_EXP_CALCULATION //修改经验的计算方式
-#define SHOW_MP_DECREASING //当mp减少时也显示数值
 #define ADD_SOME_POISONS_SUCCESSFULLY_ANYTIME		//某些毒可以对任何人均命中（无视敌方巫抗或我方毒抗）
-#define ADD_SOME_STATUSES_SUCCESSFULLY_ANYTIME		//为敌人添加状态总是成功（无视巫抗）
 
 #define INCREASE_ATTRIBUTE_AFTER_USE_MENGSHE		//灵儿使用梦蛇后，各项属性增加
 
 #define INCREASE_EXTRA_PLAYER_HPMP					//回复体力真气的时候，额外回复一定百分比（根据等级）
-//#define INCREASE_EXTRA_HPMP_MIN_LEVEL		50
-//#define INCREASE_EXTRA_HPMP_MAX_LEVEL		70
-
-//#define New_EDIT_SCRIPT_OPERATION_0X0034			//修改灵葫炼丹为商店
 
 //解决幻影林天南 BUG
 #define LIN_TIAN_NAN_BUG
@@ -187,7 +177,7 @@ extern "C"
 #define VOID void
 #define FALSE 0
 #define TRUE  1
-#define CP_UTF8                   65001       // UTF-8 translation
+#define CP_UTF8   65001       // UTF-8 translation;
 
 #ifndef _WIN32
     typedef unsigned long       DWORD;
@@ -313,9 +303,7 @@ extern "C"
 
 #define PAL_ADDITIONAL_WORD_SECOND			20001
 
-//#ifdef SHOW_DATA_IN_BATTLE
 #define BATTLEUI_LABEL_DATA				PAL_ADDITIONAL_WORD_SECOND
-//#endif
 
 #define BATTLEUI_LABEL_ENEMY_STATUS		PAL_ADDITIONAL_WORD_SECOND + 1
 #define STATUS_LABEL_SORCERYRESISTANCE	PAL_ADDITIONAL_WORD_SECOND + 2

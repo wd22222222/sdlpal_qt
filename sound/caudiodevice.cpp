@@ -255,7 +255,8 @@ None.
     // Play sound for AVI
     //
 #ifdef USE_EVENTHANDLER
-	pushEventForPlay(eventTypeCustom::eventAviMusicPlay, stream, len);
+    if (cfgUseAVI)
+        pushEventForPlay(eventTypeCustom::eventAviMusicPlay, stream, len);
 #else
     //不使用EVENTHANDLER 传递数据
     CAviPlay::AVI_FillAudioBuffer(stream.data(), len);

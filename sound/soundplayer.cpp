@@ -378,7 +378,6 @@ SoundPlay::SoundPlay() {
     const char* mkfs[2]{ 0 };
     SoundLoader func[2]{ 0 };
     int i;
-    //auto gConfig = CPalEvent::gConfig;
     if (lpAudioData->IsWIN95)
     {
         mkfs[0] = "sounds.mkf"; func[0] = &SOUND_LoadWAVEData;
@@ -416,7 +415,6 @@ int SoundPlay::Player(int iSoundNum, bool, float) {
     const void* snddata;
     int           len, i;
 
-    //auto gConfig = CPalEvent::gConfig;
     //
     // Check for NULL pointer.
     //

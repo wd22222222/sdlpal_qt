@@ -35,9 +35,10 @@ CSound::CSound()
 CSound::~CSound()
 {
     //等待进程退出
-    while (PalSoundIn) {
-        PAL_Delay(1);
-    };
+//等待声音进程结束
+    int timeout{};
+    while (PalSoundIn && timeout<1000)
+        PAL_Delay(1), timeout++;
 
     if (gAudioDevice)
         delete gAudioDevice;
@@ -100,7 +101,7 @@ VOID CSound::soundRun()
         if (!gAudioDevice->pAudioStream)
             break;
         const auto streamSize = SDL_GetAudioStreamQueued(gAudioDevice->pAudioStream);
-        const auto Len = 8192 * ggConfig->iAudioChannels;
+        const auto Len = 8192 * CConfig::cfgChannels;
         if (streamSize < Len)
         {
             AUDIO_FillBuffer(MusicBuf, 2048);
@@ -109,13 +110,16 @@ VOID CSound::soundRun()
             ;
         }
 #else
-        if (gAudioDevice && SDL_GetQueuedAudioSize(gAudioDevice->audioID)
-            < 8192 * ggConfig->iAudioChannels)
+        int c = SDL_GetQueuedAudioSize(gAudioDevice->audioID);
+        if (gAudioDevice &&
+            c < 8192 * CConfig::cfgChannels)
         {
             AUDIO_FillBuffer(MusicBuf, MusicBuf.size());
-            SDL_QueueAudio(gAudioDevice->audioID, MusicBuf.data(), MusicBuf.size());
+            if (SDL_QueueAudio(gAudioDevice->audioID, MusicBuf.data(), MusicBuf.size()))
+                printMsg("err SDL_PutAudioStreamData %s", SDL_GetError());
         }
 #endif
+
         PAL_Delay(10);
     }
     //
@@ -133,25 +137,25 @@ PalErr CSound::AUDIO_OpenDevice()
 {
     AudioPlayer::lpAudioData = &gAudioData;
     //
-    gAudioData.mAudioDevice = ggConfig->iAudioDevice;
-    gAudioData.SampleRate = ggConfig->iSampleRate;
-    gAudioData.ResampleQuality = ggConfig->iResampleQuality;
-    gAudioData.AudioChannels = ggConfig->iAudioChannels;
-    gAudioData.FirstUseMp3 = ggConfig->firstUseMp3;
-    gAudioData.MusicVolume = ggConfig->iMusicVolume;
-    gAudioData.SoundVolume = ggConfig->iSoundVolume;
-    gAudioData.AudioBufferSize = ggConfig->wAudioBufferSize;
+    gAudioData.mAudioDevice = cfgAudioDevID;
+    gAudioData.SampleRate = cfgSampleRate;
+    gAudioData.ResampleQuality = cfgSampleQual;
+    gAudioData.AudioChannels = cfgChannels;
+    gAudioData.FirstUseMp3 = cfgFirstUseMp3;
+    gAudioData.MusicVolume = cfgMusicVol;
+    gAudioData.SoundVolume = cfgSoundVolume;
+    gAudioData.AudioBufferSize = cfgMusicBuf;
     gAudioData.NoMusic = false;
     gAudioData.NoSound = false;
-    gAudioData.MusicType = ggConfig->eMusicType;
+    gAudioData.MusicType = cfgMusicType;
     gAudioData.PalDir = PalDir;
-    gAudioData.IsWIN95 = ggConfig->fIsWIN95;
-    gAudioData.OPLChip = ggConfig->eOPLChip;
-    gAudioData.OPLCore = ggConfig->eOPLCore;
-    gAudioData.UseSurroundOPL = ggConfig->fUseSurroundOPL;
-    gAudioData.OPLSampleRate = ggConfig->iOPLSampleRate;
-    gAudioData.ResampleQuality = ggConfig->iResampleQuality;
-    gAudioData.SurroundOPLOffset = ggConfig->iSurroundOPLOffset;
+    gAudioData.IsWIN95 = cfgIsWin95;
+    gAudioData.OPLChip = CConfig::cfgOPLChip;
+    gAudioData.OPLCore = CConfig::cfgOPLCore;
+    gAudioData.UseSurroundOPL = cfgSurroundOPL;
+    gAudioData.OPLSampleRate = CConfig::cfgOPLSampleRate;
+    gAudioData.ResampleQuality = CConfig::cfgSampleQual;
+    gAudioData.SurroundOPLOffset = cfgSurroundOPL;
 	//创建音频设备
     gAudioDevice = new CAudioDevice(&gAudioData);
 #if USING_SDL3
@@ -202,7 +206,7 @@ VOID SDLCALL CSound::AUDIO_FillBuffer(ByteArray& stream, INT len)
 VOID CSound::AUDIO_PlayMusicInRun(INT iNumRIX, BOOL fLoop, FLOAT flFadeTime)
 {
     int ret{};
-    if (CPalEvent::ggConfig->firstUseMp3 && gAudioDevice->pMp3Player)//优先使用MP3
+    if (cfgFirstUseMp3 && gAudioDevice->pMp3Player)//优先使用MP3
     {
 #if USING_SDL3
         // On SDL3 stream mode don't lock the stream (SDL_LockAudioStream can hang). Call player directly.

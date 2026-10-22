@@ -1,3 +1,6 @@
+#include "cbattlebase.h"
+#include "cbattlebase.h"
+#include "cbattlebase.h"
 ///* -*- mode: c; tab-width: 4; c-basic-offset: 4; c-file-style: "linux" -*- */
 //
 // Copyright (c) 2009-2011, Wei Mingzhi <whistler_wmz@users.sf.net>.
@@ -25,6 +28,8 @@
 
 #include "cbattlebase.h"
 #include "cpaldata.h"
+#include "paltexture.h"
+#include <utility>
 //#include <scclient.h>
 #define  NOMINMAX
 CBattleBase::CBattleBase()
@@ -98,7 +103,7 @@ VOID CBattleBase::PAL_BattleMakeScene()
 		}
 	}
 
-	if (g_Battle.lpSummonSprite != NULL)
+	if (g_Battle.lpSummonSprite.size())
 	{
 		//
 		// Draw the summoned god	绘制召唤神的画面
@@ -135,7 +140,8 @@ VOID CBattleBase::PAL_BattleMakeScene()
 			{
 				PAL_RLEBlitWithColorShift(lBMR, mSurf, pos, g_Battle.rgPlayer[i].iColorShift, 0);
 			}
-			else if (g_Battle.iHidingTime == 0)
+			//else if (g_Battle.iHidingTime <= 0)
+			else if (PAL_GetHidingTime() <= 0)
 			{
 				PAL_RLEBlitToSurface(lBMR, mSurf, pos, 0, 0);
 			}
@@ -162,7 +168,7 @@ VOID CBattleBase::PAL_BattleMakeScene()
 				{
 					PAL_RLEBlitWithColorShift(lBMR, mSurf, pos, g_Battle.rgPlayer[i].iColorShift, 0);
 				}
-				else if (g_Battle.iHidingTime == 0)
+				else if (PAL_GetHidingTime() <= 0)
 				{
 					PAL_RLEBlitToSurface(lBMR, mSurf, pos, 0, 0);
 				}
@@ -262,7 +268,7 @@ VOID CBattleBase::PAL_BattleUpdateFighters(
 
 BOOL  CBattleBase::PAL_IsPlayerDying(
 	WORD		wPlayerRole
-)
+)const
 /*++
   功能：    Check if the player is dying.
   检查角色是否濒死了
@@ -308,276 +314,6 @@ INT CBattleBase::PAL_BattleSelectAutoTarget(VOID)
 	return -1;
 }
 
-INT  CBattleBase::PAL_CalcBaseDamage(
-	DWORD wAttackStrength, DWORD wDefense
-)
-/*++
-  功能：    Calculate the base damage value of attacking.
-  计算基础伤害值
-  参数：    [IN]  wAttackStrength - attack strength of attacker.
-  [IN]  wDefense - defense value of inflictor.
-  攻击者武术值，被攻击者防御值
-  返回值：   The base damage value of the attacking.
-  基础伤害值
-  --*/
-{
-	INT            iDamage;
-
-	//
-	// Formula courtesy of palxex and shenyanduxing
-	//
-	if (ggConfig->m_Function_Set[1]) {// #ifdef EDIT_DAMAGE_CALC
-		if (wAttackStrength > 2 * wDefense)
-		{
-			iDamage = wAttackStrength * 1.5 - wDefense * 0.5;
-		}
-		else if (wAttackStrength > wDefense)
-		{
-			iDamage = wAttackStrength * 2 - wDefense * 1.5;
-		}
-		else if (wAttackStrength > wDefense * 0.5)
-		{
-			iDamage = wAttackStrength - wDefense * 0.5;
-		}
-		else
-		{
-			iDamage = 0;
-		}
-	}
-	else //#else
-	{ 
-		if (wAttackStrength > wDefense)
-		{
-			iDamage = (INT)(wAttackStrength * 2 - wDefense * 1.6 + 0.5);
-		}
-		else if (wAttackStrength > wDefense * 0.6)
-		{
-			iDamage = (INT)(wAttackStrength - wDefense * 0.6 + 0.5);
-		}
-		else
-		{
-			iDamage = 0;
-		}
-	}//#endif
-
-	return iDamage;
-}
-
-INT CBattleBase::PAL_CalcMagicDamage(
-	DWORD wMagicStrength, DWORD wDefense,
-
-	SHORT			sElementalResistance[NUM_MAGIC_ELEMENTAL],
-
-	SHORT			sPoisonResistance,
-	WORD			wMagicID
-)
-/*++
-	功能：     Calculate the damage of magic.
-	计算法术伤害值
-	参数：     [IN]  wMagicStrength - magic strength of attacker.
-	[IN]  wDefense - defense value of inflictor.
-	[IN]  rgwElementalResistance - inflictor's resistance to the elemental magics.
-	[IN]  wPoisonResistance - inflictor's resistance to poison.
-	[IN]  wMagicID - object ID of the magic.
-	攻击者灵力值，被攻击者防御值，被攻击者对各属性伤害的抗性，被攻击者毒抗，法术id
-	返回值： The damage value of the magic attack.
-	法术伤害值
-	--*/
-{
-	INT             iDamage;
-	WORD            wElem;
-	WORD	        wBaseDamage;
-	WORD			wMagicNumber;
-
-	wMagicNumber = gpGlobals->g.rgObject[wMagicID].magic.wMagicNumber;
-	wBaseDamage = gpGlobals->g.lprgMagic[wMagicNumber].wBaseDamage;
-
-	if ((SHORT)wBaseDamage < 0)
-	{
-		return 0;
-	}
-
-	// Formula courtesy of palxex and shenyanduxing
-	wMagicStrength *= RandomFloat(1, 1.1);
-
-	iDamage = PAL_CalcBaseDamage(wMagicStrength, wDefense);
-
-	wElem = gpGlobals->g.lprgMagic[wMagicNumber].wElemental;
-
-	if (ggConfig->m_Function_Set[1]) //#ifdef EDIT_DAMAGE_CALC
-	{
-		if (wElem >= 1 && wElem <= 6)
-		{
-			iDamage /= 2;
-			iDamage += wBaseDamage * 2 / 3;
-		}
-		else
-		{
-			iDamage /= 3;
-			iDamage += wBaseDamage;
-		}
-	}
-	else//#else
-	{
-		iDamage /= 4;
-		iDamage += wBaseDamage;
-	}//#endif	
-
-
-	switch (wElem)
-	{
-	case 1:
-	case 2:
-	case 3:
-	case 4:
-	case 5:
-	{
-		iDamage *= (100.0 - static_cast<float> (sElementalResistance[wElem - 1])) / 100.0;
-		SHORT rgsMagicEffect = 10 + gpGlobals->g.lprgBattleField[gpGlobals->wNumBattleField].rgsMagicEffect[wElem - 1];
-		iDamage *= rgsMagicEffect / 10.0;
-		break;
-	}
-
-	case 6: //毒系
-	{
-		iDamage *= (100.0 - static_cast<float>(sPoisonResistance)) / 100.0;
-		break;
-	}
-
-	case 0:
-	default:
-		break;
-	}
-	return iDamage;
-}
-
-INT CBattleBase::PAL_CalcPhysicalAttackDamage(
-	DWORD wAttackStrength, DWORD wDefense, DWORD wAttackResistance
-)
-/*++
-  功能：    Calculate the damage value of physical attacking.
-  计算物理攻击伤害值
-  参数：    [IN]  wAttackStrength - attack strength of attacker.
-  [IN]  wDefense - defense value of inflictor.
-  [IN]  wAttackResistance - inflictor's resistance to physical attack.
-  攻击者武术值，被攻击者防御值，被攻击者物抗
-  返回值：    The damage value of the physical attacking.
-  物理攻击伤害值
-  --*/
-{
-	INT             iDamage;
-
-	iDamage = PAL_CalcBaseDamage(wAttackStrength, wDefense);
-	//wAttackResistance = min(wAttackResistance, 20);
-	if (wAttackResistance != 0)
-	{
-		//iDamage *= iDamage * 10 / wAttackResistance;
-		iDamage *= (110.0 - wAttackResistance) / 100.0;
-	}
-
-	return iDamage;
-}
-
-WORD CBattleBase::PAL_GetPlayerActualDexterity(
-	WORD			wPlayerRole
-)
-/*++
-  功能：    Get player's actual dexterity value in battle.
-  获得在战斗中角色的实际的身法值
-  参数：    [IN]  wPlayerRole - the player role ID.
-  角色id
-  返回值：    The player's actual dexterity value.
-  角色的实际的身法值
-  --*/
-{
-	DWORD wDexterity = PAL_GetPlayerDexterity(wPlayerRole);
-
-	if (gpGlobals->rgPlayerStatus[wPlayerRole][kStatusHaste] != 0)
-	{
-#ifdef PAL_CLASSIC
-		if (gpGlobals->wMaxPartyMemberIndex < 3)
-		{
-			wDexterity *= 3;
-		}
-		else
-		{
-			wDexterity *= 6;
-		}
-#else
-		wDexterity *= 6;
-		wDexterity /= 5;
-#endif
-	}
-#ifndef PAL_CLASSIC
-	else if (gpGlobals->rgPlayerStatus[wPlayerRole][kStatusSlow] != 0)
-	{
-		wDexterity *= 2;
-		wDexterity /= 3;
-	}
-#endif
-	if (PAL_IsPlayerDying(wPlayerRole))
-	{
-		//
-		// player who is low of HP should be slower
-		//
-#ifdef PAL_CLASSIC
-		wDexterity /= 2;
-#else
-		wDexterity *= 4;
-		wDexterity /= 5;
-#endif
-	}
-
-    return std::min(0xffff,(int)wDexterity);
-}
-
-VOID CBattleBase::PAL_BattlePlayerCheckReady(VOID)
-/*++
-  功能：
-
-  Check if there are player who is ready.
-
-  参数：
-
-  None.
-
-  返回值：
-
-  None.
-
-  --*/
-{
-	float   flMax = 0;
-	int     iMax = 0, i;
-
-	//
-	// Start the UI for the fastest and ready player
-	//
-	for (i = 0; i <= gpGlobals->wMaxPartyMemberIndex; i++)
-	{
-		if (g_Battle.rgPlayer[i].state == kFighterCom ||
-			(g_Battle.rgPlayer[i].state == kFighterAct && g_Battle.rgPlayer[i].action.ActionType == kBattleActionCoopMagic))
-		{
-			flMax = 0;
-			break;
-		}
-		else if (g_Battle.rgPlayer[i].state == kFighterWait)
-		{
-			if (g_Battle.rgPlayer[i].flTimeMeter > flMax)
-			{
-				iMax = i;
-				flMax = g_Battle.rgPlayer[i].flTimeMeter;
-			}
-		}
-	}
-
-	if (flMax >= 100.0f)
-	{
-		g_Battle.rgPlayer[iMax].state = kFighterCom;
-		g_Battle.rgPlayer[iMax].fDefending = FALSE;
-	}
-}
-
 VOID CBattleBase::PAL_LoadBattleBackground(
 	VOID
 )
@@ -591,19 +327,20 @@ VOID CBattleBase::PAL_LoadBattleBackground(
 	//
 	// Create the surface
 	//
-    g_Battle.lpBackground = PalSurface(gpPalette, PictureWidth, PictureHeight);
+	g_Battle.lpBackground = PalTexture (PictureWidth, PictureHeight);
+
 
 	//
 	// Load the picture
 	//读取图片
-	ByteArray buf(320 * 200);
+	ByteArray buf(PictureWidth * PictureHeight);
 	PAL_MKFDecompressChunk(buf.data(), PictureWidth * PictureHeight, 
 		gpGlobals->wNumBattleField, gpGlobals->f.fpFBP);
 
 	//
 	// Draw the picture to the surface.
 	//
-	PAL_FBPBlitToSurface(buf.data(), g_Battle.lpBackground.get());
+	PAL_FBPBlitToSurface(buf.data(), g_Battle.lpBackground);
 }
 
 INT CBattleBase::PAL_New_GetAliveEnemyNum()
@@ -646,9 +383,7 @@ VOID CBattleBase::PAL_LoadBattleSprites(
 			continue;
 		}
 
-		g_Battle.rgPlayer[i].lpSprite = (LPSPRITE)UTIL_calloc(l, 1);
-
-		PAL_MKFDecompressChunk(g_Battle.rgPlayer[i].lpSprite, l, s, gpGlobals->f.fpF);
+		g_Battle.rgPlayer[i].lpSprite =	PAL_MKFDecompressChunk(s, gpGlobals->f.fpF);
 		
 		//
 		// Set the default position for this player
@@ -678,12 +413,12 @@ VOID CBattleBase::PAL_LoadBattleSprites(
 			continue;
 		}
 		//申请内存
-		g_Battle.rgEnemy[i].lpSprite = (LPSPRITE)UTIL_calloc(l, 1);
+		g_Battle.rgEnemy[i].lpSprite.resize(l);
 
 		//读入图像
 		DWORD sEnemyID = gpGlobals->g.rgObject
 			[g_Battle.rgEnemy[i].wObjectID].enemy.wEnemyID;
-		PAL_MKFDecompressChunk(g_Battle.rgEnemy[i].lpSprite, l, sEnemyID, fp);
+		g_Battle.rgEnemy[i].lpSprite = PAL_MKFDecompressChunk(sEnemyID, fp);
 
 		//
 		// Set the default position for this enemy
@@ -716,27 +451,15 @@ VOID CBattleBase::PAL_FreeBattleSprites(
 	//释放左右已读取的子画面
 	for (i = 0; i <= gpGlobals->wMaxPartyMemberIndex; i++)
 	{
-		if (g_Battle.rgPlayer[i].lpSprite)
-		{
-			free(g_Battle.rgPlayer[i].lpSprite);
-		}
-		g_Battle.rgPlayer[i].lpSprite = nullptr;
+		g_Battle.rgPlayer[i].lpSprite.clear();
 	}
 
 	for (i = 0; i <= g_Battle.wMaxEnemyIndex; i++)
 	{
-		if (g_Battle.rgEnemy[i].lpSprite != NULL)
-		{
-			free(g_Battle.rgEnemy[i].lpSprite);
-		}
-		g_Battle.rgEnemy[i].lpSprite = NULL;
+		g_Battle.rgEnemy[i].lpSprite.clear();;
 	}
 
-	if (g_Battle.lpSummonSprite != NULL)
-	{
-		free(g_Battle.lpSummonSprite);
-	}
-	g_Battle.lpSummonSprite = NULL;
+	g_Battle.lpSummonSprite.clear();
 }
 
 VOID CBattleBase::PAL_BattleBackupStat(
@@ -773,56 +496,14 @@ VOID CBattleBase::PAL_BattleBackupStat(
 }
 
 
-INT CBattleBase::PAL_New_GetAlivePlayerNum(VOID)
-{
-	INT i, num;
-	WORD wPlayerRole;
-	for (i = 0, num = 0; i <= gpGlobals->wMaxPartyMemberIndex; i++)
-	{
-		wPlayerRole = gpGlobals->rgParty[i].wPlayerRole;
-		if (gpGlobals->g.PlayerRoles.rgwHP[wPlayerRole] != 0)
-		{
-			num++;
-		}
-	}
-	return num;
-}
-
-INT CBattleBase:: PAL_New_GetHealthyPlayerNum(VOID)
-{
-	INT i, num;
-	WORD wPlayerRole;
-	for (i = 0, num = 0; i <= gpGlobals->wMaxPartyMemberIndex; i++)
-	{
-		wPlayerRole = gpGlobals->rgParty[i].wPlayerRole;
-		if (gpGlobals->g.PlayerRoles.rgwHP[wPlayerRole] != 0 && PAL_New_IfPlayerCanMove(wPlayerRole))
-		{
-			num++;
-		}
-	}
-	return num;
-}
-
-BOOL CBattleBase:: PAL_New_IfPlayerCanMove(WORD wPlayerRole)
-{
-	if (gpGlobals->rgPlayerStatus[wPlayerRole][kStatusSleep] == 0 &&
-		gpGlobals->rgPlayerStatus[wPlayerRole][kStatusParalyzed] == 0 &&
-		gpGlobals->rgPlayerStatus[wPlayerRole][kStatusConfused] == 0)
-	{
-		return TRUE;
-	}
-	else
-	{
-		return FALSE;
-	}
-}
-
 BOOL CBattleBase::PAL_New_IfEnemyCanMove(WORD wEnemyIndex)
 {
 	if (g_Battle.rgEnemy[wEnemyIndex].rgwStatus[kStatusSleep] == 0 &&
 		g_Battle.rgEnemy[wEnemyIndex].rgwStatus[kStatusParalyzed] == 0 &&
 		g_Battle.rgEnemy[wEnemyIndex].rgwStatus[kStatusConfused] == 0 &&
-		g_Battle.iHidingTime <= 0)
+		//g_Battle.iHidingTime <= 0
+		PAL_GetHidingTime() <= 0
+		)
 	{
 		return TRUE;
 	}
@@ -890,19 +571,11 @@ INT CBattleBase::PAL_New_EnemyNotMoved(WORD wEnemyIndex)
     i = std::max((int)g_Battle.rgEnemy[wEnemyIndex].rgwStatus[kStatusSleep], i);
     i = std::max((int)g_Battle.rgEnemy[wEnemyIndex].rgwStatus[kStatusParalyzed], i);
     i = std::max((int)g_Battle.rgEnemy[wEnemyIndex].rgwStatus[kStatusConfused], i);
-    i = std::max((int)g_Battle.iHidingTime <= 0 ? 0 : g_Battle.iHidingTime, i);
+	//i = std::max((int)g_Battle.iHidingTime <= 0 ? 0 : g_Battle.iHidingTime, i);
+	i = std::max(PAL_GetHidingTime() <= 0 ? 0 : PAL_GetHidingTime(), i);
+
 	return i;
-	/*
-		if (g_Battle.rgEnemy[wEnemyIndex].rgwStatus[kStatusSleep] == 0 &&
-			g_Battle.rgEnemy[wEnemyIndex].rgwStatus[kStatusParalyzed] == 0 &&
-			g_Battle.rgEnemy[wEnemyIndex].rgwStatus[kStatusConfused] == 0 &&
-			g_Battle.iHidingTime <= 0)
-		{
-			return TRUE;
-		}
-		else
-		{
-			return FALSE;
-		}
-		*/
 }
+
+
+

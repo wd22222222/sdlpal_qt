@@ -42,8 +42,6 @@ public:
     static INT PAL_MKFGetChunkSize(UINT uiChunkNum,const ByteArray& fp);
     static INT PAL_MKFGetChunkCount(const ByteArray& fp); 
 
-    static int pByteToInt(LPCBYTE p);
-
     static INT PAL_MKFReadChunk(
         LPBYTE          lpBuffer,
         UINT            uiBufferSize,
@@ -74,7 +72,7 @@ public:
     
  
     //读取说明
-    std::string PAL_GetObjectDesc(LPOBJECTDESC   lpObjectDesc, WORD  wObjectID);
+    std::string PAL_GetObjectDesc(const OBJECTDESC& rgObjectDesc, WORD  wObjectID);
     std::string PAL_GetWord(WORD wNumWord);
     //载入说明
     //LPOBJECTDESC PAL_LoadObjectDesc(LPCSTR lpszFileName);

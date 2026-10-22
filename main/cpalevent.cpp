@@ -32,30 +32,34 @@
 //static unsigned seed;
 
 // 随机数引擎
-//static std::default_random_engine generator(seed);
+
 static std::mt19937 generator(std::random_device{}());
 
 CPalEvent::CPalEvent()
 {
 	//seed = std::chrono::system_clock::now().time_since_epoch().count();
 	
+	CPalEventHandler _m;
 	//注册退出事件
 	_m.registCallback(SDL_QUIT, [this](const SDL_Event* e) {
-		static BOOL reEvent = 0;
-		if (reEvent)
+
+		if (SDL_GL_GetCurrentContext() == nullptr)
+		{
+			SDL_Event evt;
+			evt.type = SDL_QUIT;;
+			SDL_PushEvent(&evt);
 			return;
-		reEvent = TRUE;
+		}
 		if (pCScript->PAL_ConfirmMenu("退出吗？"))
 		{
 			pCScript->PAL_PlayMUS(0, FALSE, 2);
 			pCScript->PAL_FadeOut(2);
 			PalQuit = TRUE;
 		}
-		reEvent = FALSE;
 		//清除按键状态
 		PAL_ClearKeyAll();
 		});
-
+	
 	//注册：keydown信号
 	_m.registCallback(SDL_KEYDOWN, std::bind(&CPalEvent::KeydownEvent,
 		this, std::placeholders::_1));
@@ -80,6 +84,8 @@ CPalEvent::~CPalEvent()
 }
 int CPalEvent::PAL_PollEvent(SDL_Event* event)
 {
+	//单独处理退出事件
+	CPalEventHandler _m;
 	return _m.PAL_PollEvent(event);
 }
 
@@ -98,7 +104,7 @@ void CPalEvent::KeydownEvent(const SDL_Event* lpEvent)
 			return;
 		}
 	}
-	if ((CPalEvent::ggConfig->m_Function_Set[53] &&
+	if ((cfgAutoSave &&
 		get_SDL_EnevtKeyMod(lpEvent) & KMOD_CTRL) &&
 		get_SDL_EnevtKey(lpEvent) == SDLK_s)
 	{
@@ -117,7 +123,7 @@ void CPalEvent::KeydownEvent(const SDL_Event* lpEvent)
 
 	case SDLK_UP:
 	case SDLK_KP8:
-	case SDLK_j:
+	//case SDLK_j:
 		if (fInBattle || g_InputState.dir != kDirNorth)
 		{
 			g_InputState.prevdir = (fInBattle ? kDirUnknown : g_InputState.dir);
@@ -128,7 +134,7 @@ void CPalEvent::KeydownEvent(const SDL_Event* lpEvent)
 
 	case SDLK_DOWN:
 	case SDLK_KP2:
-	case SDLK_n:
+	//case SDLK_n:
 		if (fInBattle || g_InputState.dir != kDirSouth)
 		{
 			g_InputState.prevdir = (fInBattle ? kDirUnknown : g_InputState.dir);
@@ -139,7 +145,7 @@ void CPalEvent::KeydownEvent(const SDL_Event* lpEvent)
 
 	case SDLK_LEFT:
 	case SDLK_KP4:
-	case SDLK_b:
+	//case SDLK_b:
 		if (fInBattle || g_InputState.dir != kDirWest)
 		{
 			g_InputState.prevdir = (fInBattle ? kDirUnknown : g_InputState.dir);
@@ -150,7 +156,7 @@ void CPalEvent::KeydownEvent(const SDL_Event* lpEvent)
 
 	case SDLK_RIGHT:
 	case SDLK_KP6:
-	case SDLK_m:
+	//case SDLK_m:
 		if (fInBattle || g_InputState.dir != kDirEast)
 		{
 			g_InputState.prevdir = (fInBattle ? kDirUnknown : g_InputState.dir);
@@ -236,7 +242,7 @@ void CPalEvent::KeyupEvent(const SDL_Event* lpEvent) {
 	{
 	case SDLK_UP:
 	case SDLK_KP8:
-	case SDLK_j:
+	//case SDLK_j:
 		if (g_InputState.dir == kDirNorth)
 		{
 			g_InputState.dir = g_InputState.prevdir;
@@ -246,7 +252,7 @@ void CPalEvent::KeyupEvent(const SDL_Event* lpEvent) {
 
 	case SDLK_DOWN:
 	case SDLK_KP2:
-	case SDLK_n:
+	//case SDLK_n:
 		if (g_InputState.dir == kDirSouth)
 		{
 			g_InputState.dir = g_InputState.prevdir;
@@ -256,7 +262,7 @@ void CPalEvent::KeyupEvent(const SDL_Event* lpEvent) {
 
 	case SDLK_LEFT:
 	case SDLK_KP4:
-	case SDLK_b:
+	//case SDLK_b:
 		if (g_InputState.dir == kDirWest)
 		{
 			g_InputState.dir = g_InputState.prevdir;
@@ -266,7 +272,7 @@ void CPalEvent::KeyupEvent(const SDL_Event* lpEvent) {
 
 	case SDLK_RIGHT:
 	case SDLK_KP6:
-	case SDLK_m:
+	//case SDLK_m:
 		if (g_InputState.dir == kDirEast)
 		{
 			g_InputState.dir = g_InputState.prevdir;
@@ -312,59 +318,63 @@ void CPalEvent::MouseDownEvent(const SDL_Event* lpEvent)
 	x = (x - gView.x) * PictureWidth / gView.w;
 	y = (y - gView.y) * PictureHeight / gView.h;
 	g_InputMouse = PAL_XY(x, y);
-	mouseInputKey = isRectsAtPoint(mouseInputList,g_InputMouse);
-	if (mouseInputKey)
+	//检测是否在鼠标输入框内
+	if (cfgShowCursor)
 	{
-		SDL_Event event{};
-		switch (mouseInputKey)
+		mouseInputKey = isRectsAtPoint(mouseInputList, g_InputMouse);
+		if (mouseInputKey)
 		{
-		case 1:
-			set_SDL_EventKey(&event, SDLK_ESCAPE);
-			break;
-		case 2:
-			set_SDL_EventKey(&event, SDLK_UP);
-			break;
-		case 3:
-			set_SDL_EventKey(&event, SDLK_SPACE);
-			break;
-		case 4:
-			set_SDL_EventKey(&event, SDLK_LEFT);
-			break;
-		case 5:
-			if (fInBattle)
-				set_SDL_EventKey(&event, SDLK_f);
-			else
+			SDL_Event event{};
+			switch (mouseInputKey)
+			{
+			case 1:
+				set_SDL_EventKey(&event, SDLK_ESCAPE);
+				break;
+			case 2:
+				set_SDL_EventKey(&event, SDLK_UP);
+				break;
+			case 3:
 				set_SDL_EventKey(&event, SDLK_SPACE);
-			break;
-		case 6:
-			set_SDL_EventKey(&event, SDLK_RIGHT);
-			break;
-		case 7:
-			set_SDL_EventKey(&event, SDLK_PAGEUP);
-			break;
-		case 8:
-			set_SDL_EventKey(&event, SDLK_DOWN);
-			break;
-		case 9:
-			set_SDL_EventKey(&event, SDLK_PAGEDOWN);
-			break;
-		default:
-			printf("鼠标输入错 err  \n");
-			break;
+				break;
+			case 4:
+				set_SDL_EventKey(&event, SDLK_LEFT);
+				break;
+			case 5:
+				if (fInBattle)
+					set_SDL_EventKey(&event, SDLK_f);
+				else
+					set_SDL_EventKey(&event, SDLK_SPACE);
+				break;
+			case 6:
+				set_SDL_EventKey(&event, SDLK_RIGHT);
+				break;
+			case 7:
+				set_SDL_EventKey(&event, SDLK_PAGEUP);
+				break;
+			case 8:
+				set_SDL_EventKey(&event, SDLK_DOWN);
+				break;
+			case 9:
+				set_SDL_EventKey(&event, SDLK_PAGEDOWN);
+				break;
+			default:
+				std::cout << "鼠标输入错 err  \n";
+				break;
+			}
+			//模拟按下按键
+			//event.user.data1 = reinterpret_cast<void*>(mouseInputKey);
+			event.type = SDL_KEYDOWN;
+			//存最后鼠标键值，用于鼠标抬起
+			lastMouseDir = get_SDL_EnevtKey(&event);
+			SDL_PushEvent(&event);
+			PAL_ProcessEvent();
+			return;
 		}
-		//模拟按下按键
-		//event.user.data1 = reinterpret_cast<void*>(mouseInputKey);
-		event.type = SDL_KEYDOWN;
-		//存最后鼠标键值，用于鼠标抬起
-		lastMouseDir = get_SDL_EnevtKey(&event);
-		SDL_PushEvent(&event);
-		PAL_ProcessEvent();
-		return;
 	}
 	//如果不在场景中，记录鼠标位置
 	if (!isInScene)
 	{
-		std::cout << "Mouse Button Down: " << "x =" << x << ", y =" << y << "\n";
+		//std::cout << "Mouse Button Down: " << "x =" << x << ", y =" << y << "\n";
 		return;//跳出
 	}
 	//北在右上方，南在左下方，西在左上方，东在右下方
@@ -446,12 +456,6 @@ void CPalEvent::MouseMotionEvent(const SDL_Event* lpEvent)
 
 
 
-int SDLCALL CPalEvent::PAL_EventFilter(SDL_Event* lpEvent)
-{
-	_m.handleEvents(lpEvent);
-	return 0;
-}
-
 VOID CPalEvent::PAL_ClearKeyState(VOID) { 
 	g_InputState.dwKeyPress = 0;
 	g_InputMouse = 0;
@@ -516,30 +520,6 @@ VOID CPalEvent::setKeyPrevdir(const PALDIRECTION k)
 VOID CPalEvent::PAL_ProcessEvent()
 {
 	while (PAL_PollEvent(NULL));
-}
-
-//申请内存，参数为申请地址的单位元素长度,元素个数
-void* CPalEvent::UTIL_calloc(size_t n, size_t size)
-{
-	// handy wrapper for operations we always forget, like checking calloc's returned pointer.
-
-	void* buffer;
-
-	// first off, check if buffer size is valid
-	if (n == 0 || size == 0)
-		TerminateOnError("UTIL_calloc() called Width invalid parameters\n");
-
-	buffer = calloc(n, size); // allocate real memory space
-
-							  // last check, check if malloc call succeeded
-	if (buffer == NULL)
-	{
-		TerminateOnError("UTIL_calloc() failure for %d bytes (out of memory?)\n", size * n);
-		return buffer;
-	}
-	SDL_memset(buffer, 0, size * n);
-
-	return buffer; // nothing went wrong, so return buffer pointer
 }
 
 char* CPalEvent::va(const char* format, ...)

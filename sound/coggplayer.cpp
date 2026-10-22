@@ -45,7 +45,7 @@
 
 #define OGG_BUFFER_LENGTH 4096
 
-#define AUDIO_IsIntegerConversion(a) (((a) % CPalEvent::ggConfig->iSampleRate) == 0 || (CPalEvent::ggConfig->iSampleRate % (a)) == 0)
+#define AUDIO_IsIntegerConversion(a) (((a) % cfgSampleRate) == 0 || (cfgSampleRate % (a)) == 0)
 
 #if defined(_MSC_VER)
 # define PAL_FORCE_INLINE static SDL_FORCE_INLINE
@@ -87,7 +87,7 @@ PAL_FORCE_INLINE ogg_int16_t OGG_GetSample(float pcm)
 
 void COggPlayer::OGG_FillResample(ogg_int16_t* stream)
 {
-	if (CPalEvent::ggConfig->iAudioChannels == 2) {
+	if (cfgChannels == 2) {
 		stream[0] = resampler_get_and_remove_sample(resampler[0]);
 		stream[1] = (vi.channels > 1) ? resampler_get_and_remove_sample(resampler[1]) : stream[0];
 	}
@@ -197,7 +197,7 @@ int COggPlayer::Player(int iNum, bool fLoop, float flFadeTime)
 void COggPlayer::OGG_Cleanup()
 {
 	int i;
-	for (i = 0; i < CPalEvent::ggConfig->iAudioChannels; i++) 
+	for (i = 0; i < cfgChannels; i++) 
 		resampler_clear(resampler[0]);
 	/* Do various cleanups */
 	if (iFlags & FLAG_VB) vorbis_block_clear(&vb);
@@ -330,13 +330,13 @@ BOOL COggPlayer::OGG_Rewind()
 																for vd here */
 		iStage = STAGE_PAGEOUT;
 		iFlags |= FLAG_VD | FLAG_VB;
-		fUseResampler = (vi.rate != CPalEvent::ggConfig->iSampleRate);
+		fUseResampler = (vi.rate != cfgSampleRate);
 
 		if (fUseResampler) {
-			double factor = (double)vi.rate / (double)CPalEvent::ggConfig->iSampleRate;
+			double factor = (double)vi.rate / (double)cfgSampleRate;
 			for (i = 0; i < std::min(vi.channels, 2); i++)
 			{
-				resampler_set_quality(resampler[i], AUDIO_IsIntegerConversion(vi.rate) ? RESAMPLER_QUALITY_MIN : CPalEvent::ggConfig->iResampleQuality);
+				resampler_set_quality(resampler[i], AUDIO_IsIntegerConversion(vi.rate) ? RESAMPLER_QUALITY_MIN : CConfig::cfgSampleQual);
 				resampler_set_rate(resampler[i], factor);
 				resampler_clear(resampler[i]);
 			}
@@ -432,7 +432,7 @@ void COggPlayer::fillBuffer(
 							j = resampler_get_sample_count(resampler[0]);
 							while (total_bytes < len && resampler_get_sample_count(resampler[0]) > 0) {
 								OGG_FillResample((ogg_int16_t*)(stream.data() + total_bytes));
-								total_bytes += CPalEvent::ggConfig->iAudioChannels * sizeof(ogg_int16_t);
+								total_bytes += CConfig::cfgChannels * sizeof(ogg_int16_t);
 							}
 
 							samples -= to_write; bout += to_write;
@@ -441,10 +441,10 @@ void COggPlayer::fillBuffer(
 					else {
 						int i;
 						ogg_int16_t* ptr = (ogg_int16_t*)(stream.data() + total_bytes);
-						bout = (len - total_bytes) / CPalEvent::ggConfig->iAudioChannels / sizeof(ogg_int16_t);
+						bout = (len - total_bytes) / CConfig::cfgChannels / sizeof(ogg_int16_t);
 						if (bout > samples) bout = samples;
 						for (i = 0; i < bout; i++) {
-							if (CPalEvent::ggConfig->iAudioChannels == 2) {
+							if (CConfig::cfgChannels == 2) {
 								ptr[0] = OGG_GetSample(pcm[0][i]);
 								ptr[1] = (vi.channels > 1) ? OGG_GetSample(pcm[1][i]) : ptr[0];
 							}
@@ -456,10 +456,10 @@ void COggPlayer::fillBuffer(
 									ptr[0] = OGG_GetSample(pcm[0][i]);
 								}
 							}
-							ptr += CPalEvent::ggConfig->iAudioChannels;
+							ptr += CConfig::cfgChannels;
 						}
 
-						total_bytes += bout * CPalEvent::ggConfig->iAudioChannels * sizeof(ogg_int16_t);
+						total_bytes += bout * CConfig::cfgChannels * sizeof(ogg_int16_t);
 					}
 					/* tell libvorbis how many samples we actually consumed */
 					vorbis_synthesis_read(&vd, bout);
@@ -469,10 +469,10 @@ void COggPlayer::fillBuffer(
 				}
 				break;
 			case STAGE_REWIND:
-				if (vi.rate != CPalEvent::ggConfig->iSampleRate) { /* If there are samples in the resampler, fetch them first */
+				if (vi.rate != cfgSampleRate) { /* If there are samples in the resampler, fetch them first */
 					while (total_bytes < len && resampler_get_sample_count(resampler[0]) > 0) {
 						OGG_FillResample((ogg_int16_t*)(stream.data() + total_bytes));
-						total_bytes += CPalEvent::ggConfig->iAudioChannels * sizeof(ogg_int16_t);
+						total_bytes += CConfig::cfgChannels * sizeof(ogg_int16_t);
 					}
 					/* Break out if there are still samples in the resampler */
 					if (resampler_get_sample_count(resampler[0]) > 0) break;

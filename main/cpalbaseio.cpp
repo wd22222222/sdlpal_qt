@@ -27,18 +27,19 @@
 #include "cpaldata.h"
 #include "pal_color.h"
 #include "string.h"
+#include <vector>
 CPalBaseIO::CPalBaseIO() :rgMagicItem()
 {
-	memset(&g_Battle, 0, sizeof(g_Battle));
-	memset(rgMagicItem, 0, sizeof(rgMagicItem));
-	//CAviPlay::setPAL(this);
+	
+	//memset(&g_Battle, 0, sizeof(g_Battle) - sizeof(g_Battle.spriteList));
+	g_Battle.clear();
+	
+	//memset(rgMagicItem, 0, sizeof(rgMagicItem));
 	PAL_InitResources();
 }
 
 CPalBaseIO::~CPalBaseIO()
 {
-	//PAL_FreePlayerSprites();
-	//PAL_FreeEventObjectSprites();
 	PAL_FreeResources();
 }
 
@@ -698,7 +699,7 @@ VOID CPalBaseIO::PAL_ShowWideDialogText(
 					//
 					// Set the font color to Red
 					//
-					if (!ggConfig->fIsWIN95)
+					if (!cfgIsWin95)
 					{
 						if (g_TextLib.bCurrentFontColor == FONT_COLOR_RED)
 						{

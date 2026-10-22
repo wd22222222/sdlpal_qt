@@ -606,7 +606,7 @@ bool CGetPalData::isSaveDataChaged() const {
 	for (int i = 0; i < modRoc_End; i++)
 		if (ModifRecord[i])
 			return true;
-	for (int i = 0; i < MAXSAVEFILES; i++)
+	for (int i = 0; i < pal->gpGlobals->rgSaveDataChaged.size(); i++)
 		if (pal->gpGlobals->rgSaveDataChaged[i])
 			return true;
 	return false;
@@ -616,7 +616,7 @@ VOID CGetPalData::clearSaveDataChangd()
 {
 	for (int i = 0; i < modRoc_End; i++)
 		ModifRecord[i] = 0;
-	for (int i = 0; i < MAXSAVEFILES; i++)
+	for (int i = 0; i < SAVEFILES; i++)
 		pal->gpGlobals->rgSaveDataChaged[i] = 0;
 }
 // 清除修改标志
@@ -980,7 +980,7 @@ VOID CGetPalData::PAL_Object_classify(VOID)
 //Mark The script jumps to the address
 //输入 跳转地址引用
 //返回下一跳地址，为0 结束，jumps 不为0返回三个跳转地址
-INT CGetPalData::MarkSprictJumpsAddress(WORD spriptEntry, MAPScript& mMaps)
+INT CGetPalData::MarkSprictJumpsAddress(WORD spriptEntry, MAPScript& mMaps)const
 {
 	while (TRUE)
 	{
@@ -1063,12 +1063,11 @@ INT CGetPalData::MarkSprictJumpsAddress(WORD spriptEntry, MAPScript& mMaps)
 	return 0;
 }
 
-INT CGetPalData::PAL_MarkScriptAll()
+INT CGetPalData::PAL_MarkScriptAll(PMARK & pmark)const
 {
-	//auto& gConfig = gpGlobals->gConfig;
 	{
-		pMark.clear();;
-		pMark.resize(static_cast<std::vector<sgMark, 
+		pmark.clear();;
+		pmark.resize(static_cast<std::vector<sgMark, 
 			std::allocator<sgMark>>::size_type>(pal->gpGlobals->g.nScriptEntry) + 1);
 		//pMark.resize(gpGlobals->g.nScriptEntry + 1);
 
@@ -1095,7 +1094,7 @@ INT CGetPalData::PAL_MarkScriptAll()
 					if (p[j])
 					{
 						gMARK t(n, save, 1, j);
-						PAL_MarkScriptEntryAll(p[j], t, save);
+						PAL_MarkScriptEntryAll(p[j], t, save, pmark);
 					}
 					//PAL_MarkScriptEntryAll(p[j], (save << 28) + (1 << 24) + (j << 16) + n, save);
 				}
@@ -1108,13 +1107,13 @@ INT CGetPalData::PAL_MarkScriptAll()
 				if (p[1])//进入脚本
 				{
 					gMARK t(s - 1, save, 2, 1);
-					PAL_MarkScriptEntryAll(p[1], t, save);
+					PAL_MarkScriptEntryAll(p[1], t, save, pmark);
 				}
 				//PAL_MarkScriptEntryAll(p[1], (save << 28) + (2 << 24) + (1 << 16) + s - 1, save);
 				if (p[2])//传送脚本
 				{
 					gMARK t(s - 1, save, 2, 2);
-					PAL_MarkScriptEntryAll(p[2], t, save);
+					PAL_MarkScriptEntryAll(p[2], t, save, pmark);
 				}
 				//PAL_MarkScriptEntryAll(p[2], (save << 28) + (2 << 24) + (2 << 16) + s - 1, save);
 				for (; k < pal->gpGlobals->g.nEventObject &&
@@ -1129,7 +1128,7 @@ INT CGetPalData::PAL_MarkScriptAll()
 						if (q[n])
 						{
 							gMARK t(k, save, 3, n);
-							PAL_MarkScriptEntryAll(q[n], t, save);
+							PAL_MarkScriptEntryAll(q[n], t, save, pmark);
 						}
 						//PAL_MarkScriptEntryAll(q[n], (save << 28) + (3 << 24) + (n << 16) + k, save);
 					}
@@ -1144,14 +1143,14 @@ INT CGetPalData::PAL_MarkScriptAll()
 
 //标记具体的有效脚本地址
 //参数1 入口，参数2 要标记的脚本号列表
-VOID CGetPalData::PAL_MarkScriptEntryAll(WORD Entry, const gMARK& mark, int save)
+VOID CGetPalData::PAL_MarkScriptEntryAll(WORD Entry, const gMARK& mark, int save,PMARK &pmark)const
 {
 	if (Entry == 0)
 		return;
 
-	pMark[Entry].s.push_back(mark);//标记
+	pmark[Entry].s.push_back(mark);//标记
 	// 已经标记过 返回
-	if (pMark[Entry].s.size() > 1)
+	if (pmark[Entry].s.size() > 1)
 		return;
 	LPSCRIPTENTRY p = &pal->gpGlobals->g.lprgScriptEntry[Entry];
 	switch (p->wOperation)
@@ -1176,7 +1175,7 @@ VOID CGetPalData::PAL_MarkScriptEntryAll(WORD Entry, const gMARK& mark, int save
 		{
 			{
 				gMARK t(Entry, save, 4, 2);
-				PAL_MarkScriptEntryAll(p->rgwOperand[1], t, save);
+				PAL_MarkScriptEntryAll(p->rgwOperand[1], t, save, pmark);
 			}
 			//PAL_MarkScriptEntryAll(p->rgwOperand[1], (save << 28) + (4 << 24) + (2 << 16) + Entry, save);
 		}
@@ -1189,7 +1188,7 @@ VOID CGetPalData::PAL_MarkScriptEntryAll(WORD Entry, const gMARK& mark, int save
 			//到此结束
 			{
 				gMARK t(Entry, save, 4, 1);
-				PAL_MarkScriptEntryAll(p->rgwOperand[0], t, save);
+				PAL_MarkScriptEntryAll(p->rgwOperand[0], t, save, pmark);
 			}
 			//PAL_MarkScriptEntryAll(p->rgwOperand[0], (save << 28) + (4 << 24) + (1 << 16) + Entry, save);
 			return;
@@ -1208,7 +1207,7 @@ VOID CGetPalData::PAL_MarkScriptEntryAll(WORD Entry, const gMARK& mark, int save
 		if (p->rgwOperand[0])
 		{
 			gMARK t(Entry, save, 4, 1);
-			PAL_MarkScriptEntryAll(p->rgwOperand[0], t, save);
+			PAL_MarkScriptEntryAll(p->rgwOperand[0], t, save,pmark);
 		}
 		//PAL_MarkScriptEntryAll(p->rgwOperand[0], (save << 28) + (4 << 24) + (1 << 16) + Entry, save);
 		break;
@@ -1228,7 +1227,7 @@ VOID CGetPalData::PAL_MarkScriptEntryAll(WORD Entry, const gMARK& mark, int save
 		if (p->rgwOperand[2] && p->rgwOperand[2] != 0xFFFF)
 		{
 			gMARK t(Entry, save, 4, 3);
-			PAL_MarkScriptEntryAll(p->rgwOperand[2], t, save);
+			PAL_MarkScriptEntryAll(p->rgwOperand[2], t, save, pmark);
 		}
 		//PAL_MarkScriptEntryAll(p->rgwOperand[2], (save << 28) + (4 << 24) + (3 << 16) + Entry, save);
 		break;
@@ -1238,13 +1237,13 @@ VOID CGetPalData::PAL_MarkScriptEntryAll(WORD Entry, const gMARK& mark, int save
 		if (p->rgwOperand[1])
 		{
 			gMARK t(Entry, save, 4, 2);
-			PAL_MarkScriptEntryAll(p->rgwOperand[1], t, save);
+			PAL_MarkScriptEntryAll(p->rgwOperand[1], t, save, pmark);
 		}
 		//PAL_MarkScriptEntryAll(p->rgwOperand[1], (save << 28) + (4 << 24) + (2 << 16) + Entry, save);
 		if (p->rgwOperand[2])
 		{
 			gMARK t(Entry, save, 4, 3);
-			PAL_MarkScriptEntryAll(p->rgwOperand[2], t, save);
+			PAL_MarkScriptEntryAll(p->rgwOperand[2], t, save, pmark);
 		}
 		//PAL_MarkScriptEntryAll(p->rgwOperand[2], (save << 28) + (4 << 24) + (3 << 16) + Entry, save);//标注位置为3
 		break;
@@ -1259,14 +1258,14 @@ VOID CGetPalData::PAL_MarkScriptEntryAll(WORD Entry, const gMARK& mark, int save
 	}
 	{
 		gMARK t(Entry , save, 4, 0);
-		PAL_MarkScriptEntryAll(Entry + 1, t, save);
+		PAL_MarkScriptEntryAll(Entry + 1, t, save, pmark);
 	}
 	//PAL_MarkScriptEntryAll(Entry + 1, (save << 28) + (4 << 24) + Entry, save);//进行下一行标注，标注位置为0，代表自然跳转
 	return;
 }
 
 // 替换mkf文件中的一个片段，
-int CGetPalData::replaceMKFOne(ByteArray* f, int nNum, LPCVOID buf, int BufLen)
+int CGetPalData::replaceMKFOne(ByteArray* f, int nNum, LPCVOID buf, int BufLen)const
 {
 	if (f->empty() || !buf || nNum < 0)
 		return -1;
@@ -1314,7 +1313,7 @@ int CGetPalData::replaceMKFOne(ByteArray* f, int nNum, LPCVOID buf, int BufLen)
 //脚本单行变动处理
 // 输入：变动的脚本，原行号，新行号,第一项等于第二项？
 //
-PalErr CGetPalData::SingleScriptChange(int sOld, int sNew, MAPScript& st)
+PalErr CGetPalData::SingleScriptChange(int sOld, int sNew, MAPScript& st)const
 {
 	if (sOld == sNew)
 		return 0;
@@ -1401,7 +1400,7 @@ PalErr CGetPalData::SingleScriptChange(int sOld, int sNew, MAPScript& st)
 
 
 
-INT CGetPalData::isUseYJ_1(const ByteArray& fp)
+INT CGetPalData::isUseYJ_1(const ByteArray& fp)const
 {
 	int count = pal->PAL_MKFGetChunkCount(fp);
 	int j{};
@@ -1422,8 +1421,8 @@ void CGetPalData::doSaveMapTilesToArray(int iMapNum)
 {
 	//将地图数据存储到缓存
 	auto buf = &pal->gpGlobals->f.fpMAP;
-	auto& Tiles = m_pPalMap->MapTiles;
-	assert(iMapNum == m_pPalMap->iMapNum);
+	auto& Tiles = pal->gpResources->lpMap->MapTiles;
+	assert(iMapNum == pal->gpResources->lpMap->iMapNum);
 	UINT32 len{};
 	LPVOID s{};
 	CPalData::EnCompress(Tiles, sizeof(Tiles), s, len, 0);
@@ -1451,7 +1450,7 @@ VOID CGetPalData::saveGameDataToCache()
 			cLen[j] = p->nScene * sizeof(SCENE);
 			break;
 		case 3://
-			cLen[j] = p->nObject * (CPalEvent::ggConfig->fIsWIN95 ?
+			cLen[j] = p->nObject * (cfgIsWin95 ?
 				sizeof(OBJECT) : sizeof(OBJECT_DOS));
 			break;
 		case 4:
@@ -1483,7 +1482,7 @@ VOID CGetPalData::saveGameDataToCache()
 			memcpy(pal->gpGlobals->f.fpSSS.data() + zLen[j], p->rgScene.data(), cLen[j + 1]);
 			break;
 		case 2:
-			if (CPalEvent::ggConfig->fIsWIN95)
+			if (cfgIsWin95)
 				memcpy(pal->gpGlobals->f.fpSSS.data() + zLen[j], p->rgObject.data(), cLen[j + 1]);
 			else
 			{
@@ -1555,7 +1554,7 @@ VOID CGetPalData::saveGameDataToCache()
 			cLen[j + 1] = sizeof(p->rgLevelUpExp);
 			break;
 		case 15:
-			cLen[j + 1] = sizeof(pal->ggConfig->m_Function_Set) + pal->ggConfig->m_FontName.length() + 4;
+			cLen[j + 1] = sizeof(CConfig::m_Function_Set) + CConfig::m_FontName.length() + 4;
 			break;
 		default:
 			break;
@@ -1615,10 +1614,10 @@ VOID CGetPalData::saveGameDataToCache()
 			break;
 		case 15:
 			
-			memcpy(pal->gpGlobals->f.fpDATA.data() + zLen[j], pal->ggConfig->m_Function_Set, c);
+			memcpy(pal->gpGlobals->f.fpDATA.data() + zLen[j], CConfig::m_Function_Set, c);
 			//拷贝字库目录
-			memcpy(pal->gpGlobals->f.fpDATA.data() + zLen[j] + sizeof(pal->ggConfig->m_Function_Set),
-				pal->ggConfig->m_FontName.c_str(), pal->ggConfig->m_FontName.size());
+			memcpy(pal->gpGlobals->f.fpDATA.data() + zLen[j] + sizeof(CConfig::m_Function_Set),
+			 CConfig::m_FontName.c_str(), CConfig::m_FontName.size());
 			break;
 		default:
 			break;
@@ -1634,9 +1633,9 @@ VOID CGetPalData::saveGameDataToCache()
 void CGetPalData::set_CompressFlag(int flag)
 {
 	if (flag == -1)
-		CConfig::fisUSEYJ1DeCompress = pal->gpGlobals->is_Use_YJ1_Decompress();
+		cfgIsUSEYJ1DeCompress = pal->gpGlobals->is_Use_YJ1_Decompress();
 	else
-		CConfig::fisUSEYJ1DeCompress = flag;
+		cfgIsUSEYJ1DeCompress = flag;
 }
 
 VOID CGetPalData::Utf8ToSys(std::string& s)
@@ -1645,7 +1644,7 @@ VOID CGetPalData::Utf8ToSys(std::string& s)
 	s.erase(s.find_last_not_of(" ") + 1);
 	Cls_Iconv Istr{};
 	//
-	if (!pal->ggConfig->fIsUseBig5)
+	if (!cfgUseBig5)
 	{
 		s = Istr.UTF8toGBK(s.c_str());
 		//936 to 950
@@ -1686,7 +1685,7 @@ PalErr CGetPalData::backupFile()
 	for (int n = 0; n < pal->gpGlobals->rgSaveData.size(); n++)
 	{
 		std::string s;
-		s += pal->va("%d.rpg", n + 1);
+		s += pal->va("%d.rpg", n + 1 - cfgAutoSave);
 		std::string dir = pal->PalDir + s;
 		std::string dirbak = pal->PalDir + "BAK\\";
 		dirbak += s;
@@ -1719,8 +1718,7 @@ PalErr CGetPalData::restoreFile()
 	//存档文件
 	for (int n = 0; n < MAXSAVEFILES; n++)
 	{
-		std::string s = pal->va("%d.rpg", n + 1 - 
-			CPalEvent::ggConfig->m_Function_Set[53]);
+		std::string s = pal->va("%d.rpg", n + 1 - cfgAutoSave);
 		std::string dir = pal->PalDir + s;
 		std::string dirbak = pal->PalDir + "BAK/";
 		dirbak += s;
@@ -1750,8 +1748,7 @@ PalErr CGetPalData::delBackupFile()
 	//存档文件
 	for (int n = 0; n < MAXSAVEFILES; n++)
 	{
-		std::string s = pal->va("%d.rpg", n + 1 - 
-			CPalEvent::ggConfig->m_Function_Set[53]);
+		std::string s = pal->va("%d.rpg", n + 1 - cfgAutoSave);
 		std::string dirbak = pal->PalDir + "BAK/";
 		dirbak += s;
 		if (CPalData::IsFileExist(dirbak))
@@ -1853,21 +1850,17 @@ PalErr CGetPalData::saveDataFile()
 		ModifRecord[i] = 0;
 	}
 	//存档文件
-	int maxSaveFile = CPalEvent::ggConfig->m_Function_Set[47] + 
-		CPalEvent::ggConfig->m_Function_Set[53];
-	for (int i = 0; i <maxSaveFile; i++)
+	for (int i = 0; i <SAVEFILES; i++)
 	{
 		if (pal->gpGlobals->rgSaveData[i].empty())
 			continue;
-		auto fileName = pal->gpGlobals->PalDir + pal->va("%d.rpg", i + 1
-		- CPalEvent::ggConfig->m_Function_Set[53]);
+		auto fileName = pal->gpGlobals->PalDir + pal->va("%d.rpg", i + 1 - cfgAutoSave);
 		FILE* fp{};
 		if (fopen_s(&fp, fileName.c_str(), "wb"))
 		{
 			err = 1;
 			continue;
 		}
-		//auto len = gpGlobals->rgSaveData[i].size();
 		auto len = pal->gpGlobals->getSaveFileLen();
 		fwrite(pal->gpGlobals->rgSaveData.at(i).data(), len, 1, fp);
 		fclose(fp);

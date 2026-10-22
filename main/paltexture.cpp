@@ -39,7 +39,7 @@ PalTexture::PalTexture(int aw, int ah, textType at,
     creat(aw, ah, at,colors);
 }
 
-PalTexture::PalTexture(SDL_Surface* surface)
+PalTexture::PalTexture(const SDL_Surface* surface)
 {
     if (surface)
         creat(surface);
@@ -91,8 +91,15 @@ PalErr PalTexture::creat(int aw, int ah, textType at,
     w = aw;
     h = ah;
     t = at;
+    while (glGetError());
     if (textureID == 0)
         glGenTextures(1, &textureID);
+    if (textureID == 0)
+    {
+        int err = glGetError();
+        assert(err == 0);
+        // 检查 err 是否为 GL_INVALID_OPERATION、GL_INVALID_VALUE 等
+    }
 #if USE_PBO
     if (genPBOID == 0)
         glGenBuffers(1, &genPBOID);
@@ -177,38 +184,30 @@ PalErr PalTexture::creat(int aw, int ah, textType at,
 }
 
 
-PalErr PalTexture::creat(PalSurface& surface)
+PalErr PalTexture::creat(const PalSurface& surface)
 {
 	return creat(surface.get());
 }
 
-PalErr PalTexture::creat(SDL_Surface* sSurf)
+PalErr PalTexture::creat(const SDL_Surface* sSurf)
 {
     //根据表面新建纹理
     int bits = get_Surface_bitsPerPixel(sSurf);
     if (bits != 8 &&
-        bits != 32 && bits != 16 && bits !=24)
+        bits != 32 && bits != 15 && bits != 16 && bits !=24)
     {
-        //特殊格式表面
-        SDL_Surface* m_surf = SDL_ConvertSurfaceFormat(sSurf, SDL_PIXELFORMAT_ABGR8888, 0);
-        SDL_Rect dst_rect = { 0,0,m_surf->w,m_surf->h };
-        UpdateTexture(&dst_rect, m_surf->pixels, m_surf->pitch);
-        SDL_FreeSurface(m_surf);
-        return PalErr(0);
+        assert(0);
+        return PalErr(1);
     }
 
-    //if (sSurf->format->palette)
     if (SDL_GetSurfacePalette(sSurf) != nullptr)
     {
 
-        //creat(sSurf->w, sSurf->h, textType::red8,
-            //sSurf->format->palette->colors);
         creat(sSurf->w, sSurf->h, textType::red8,
             SDL_GetSurfacePalette(sSurf)->colors);
     }
     else
-        //creat(sSurf->w, sSurf->h, getTextType(sSurf->format->BytesPerPixel));
-        creat(sSurf->w, sSurf->h, getTextType(get_Surface_bitsPerPixel(sSurf) >> 3));
+        creat(sSurf->w, sSurf->h, getTextType((get_Surface_bitsPerPixel(sSurf)+1) >> 3));
 
     UpdateTexture(NULL, sSurf->pixels, sSurf->pitch);
     return PalErr(0);
@@ -414,7 +413,7 @@ PalErr PalTexture::setTransparent_Color(const PAL_Color& color)
         return PalErr(0);
 }
 //获取透明色
-PAL_Color PalTexture::getTransparent_Color()
+PAL_Color& PalTexture::getTransparent_Color()
 {
     return transparent_color;
 }
@@ -504,13 +503,15 @@ PalErr PalTexture::setToRendererTarget()
 }
 
 //取每像素位数
-int PalTexture::getBitsPerPixel()
+const int PalTexture::getBitsPerPixel()const
 {
     switch (t)
     {
     case textType::red8:
         return 8;
     case textType::rgb16:
+        return 16;
+    case textType::rgb15:
         return 16;
     case textType::rgb24:
         return 24;

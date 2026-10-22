@@ -1,10 +1,6 @@
 ﻿#pragma once
 #include "command.h"
 #include "sdl2_compat.h"
-#include <stdexcept>
-#include "sdl2_compat.h"
-#include <vector>
-
 
 //系统基本显示画面尺度
 constexpr int PictureWidth = 320;
@@ -87,46 +83,27 @@ public:
     PalSurface() {};
     //构造
     PalSurface(int width, int height, int depth = 32,
-        Uint32 rmast = 0, Uint32 gmasr = 0, Uint32 bmast = 0, Uint32 amast = 0) {
-        e = SDL_CreateRGBSurface(0, width, height, depth, rmast, gmasr, bmast, amast);
-    }
+        Uint32 rmast = 0, Uint32 gmasr = 0, Uint32 bmast = 0, Uint32 amast = 0);
     //构造8位带索引的表面
-    PalSurface(SDL_Palette* p, int width, int height)
-    {
-        e = SDL_CreateRGBSurface(0, width, height, 8, 0, 0, 0, 0);
-        SDL_SetSurfacePalette(e, p);
-        //透明色255
-        SDL_FillRect(e, nullptr, 255);
-    }
-    // 拷贝构造函数（如果需要的话）
-    PalSurface(const PalSurface& other) {
-#if USING_SDL3
-        e = SDL_DuplicateSurface(other.e);
-#else
-        e = SDL_ConvertSurfaceFormat(other.e, other.e->format->format, 0);
-#endif
-    }
-    // 移动构造函数（如果需要的话）
-    PalSurface(PalSurface&& other) noexcept : e(other.e) {
-        other.e = nullptr; // 转移所有权，避免双重释放
-    }
+    PalSurface(SDL_Palette* p, int width, int height);
+    
+    // 拷贝构造函数 删除
+    PalSurface(const PalSurface& other) = delete;
 
-    // 移动赋值运算符（如果需要的话）
-    PalSurface& operator=(PalSurface&& other) noexcept {
-        if (this != &other) {
-            SDL_FreeSurface(e); // 释放当前资源
-            e = other.e; // 转移资源指针
-            other.e = nullptr; // 避免双重释放
-        }
-        return *this;
-    }
+    // 移动构造函数
+    PalSurface(PalSurface&& other) noexcept;
+
+    // 移动赋值运算符
+    PalSurface& operator=(PalSurface&& other) noexcept;
 
     // 析构函数
-    ~PalSurface() {
-        if (e)
-            SDL_FreeSurface(e); // 清理资源
-        e = nullptr;
-    }
+    ~PalSurface();
+
+    //创建
+    void creat(int width, int height, int depth = 32,
+        Uint32 rmast = 0, Uint32 gmasr = 0, Uint32 bmast = 0, Uint32 amast = 0);
+    //创建 8位带调色版
+    void creat(SDL_Palette* p, int width, int height);
 
     VOID clear();
     int w() const { return e->w; }

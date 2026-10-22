@@ -49,7 +49,6 @@ AudioRixPlayer::AudioRixPlayer()
 #endif //USE_EVENTHANDLER
 
     
-    //auto gConfig = CPalEvent::gConfig;
     auto chip = (Copl::ChipType)lpAudioData->OPLChip;
     if (chip == Copl::TYPE_OPL2 && lpAudioData->UseSurroundOPL)
     {
@@ -135,7 +134,7 @@ AudioRixPlayer::AudioRixPlayer()
 
 AudioRixPlayer::~AudioRixPlayer()
 {
-    //auto& gConfig = CPalEvent::gConfig;
+
     fReady = FALSE;
     for (int i = 0; i < lpAudioData->AudioChannels; i++)
         if (resampler[i])
@@ -147,7 +146,6 @@ AudioRixPlayer::~AudioRixPlayer()
 int AudioRixPlayer::Player(int iNumRIX, bool mfLoop, float flFadeTime)
 {
 
-    //auto gConfig = CPalEvent::gConfig;
     if (iNumRIX == iMusic && iNextMusic == -1)
     {
         /* Will play the same music without any pending play changes,
@@ -185,7 +183,6 @@ int AudioRixPlayer::Player(int iNumRIX, bool mfLoop, float flFadeTime)
 
 void AudioRixPlayer::fillBuffer(ByteArray& bstream, int mlen)
 {
-    //auto gConfig = CPalEvent::gConfig;
     auto stream = bstream.data();
     auto len = mlen;
 	if (rix == nullptr)

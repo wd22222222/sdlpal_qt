@@ -1,3 +1,6 @@
+#include "cpalbaseio.h"
+#include "cpalbaseio.h"
+#include "cpalbaseio.h"
 ///* -*- mode: c; tab-width: 4; c-basic-offset: 4; c-file-style: "linux" -*- */
 //
 // Copyright (c) 2009-2011, Wei Mingzhi <whistler_wmz@users.sf.net>.
@@ -160,9 +163,9 @@ BOOL CPalBaseIO::PAL_AddItemToInventory(
 	}
 }
 
-INT CPalBaseIO::PAL_GetItemAmount( 
+const INT CPalBaseIO::PAL_GetItemAmount( 
 	WORD        wItem
-)
+)const
 /*++
   Purpose:    Get the amount of the specified item in the inventory.
   Parameters:    [IN]  wItem - the object ID of the item.
@@ -224,7 +227,7 @@ BOOL CPalBaseIO::PAL_IncreaseHPMP(
 
 //#ifdef  New_HP_MP
 	BOOL   hp_Max, mp_Max;
-	if (ggConfig->m_Function_Set[7])
+	if (cfgFullRestoreFail)
 	{
 		//在此增加代码，当HP，MP达到最大值时返回失败
 
@@ -412,8 +415,7 @@ VOID CPalBaseIO::PAL_AddPoisonForPlayer(
 	if (iPoisonIndex != -1)
 	{
 		// already poisoned
-		if (ggConfig->m_Function_Set[0])
-			//#ifdef POISON_STATUS_EXPAND // 增加毒的烈度
+		if (cfgPoisonUp)
 		{
 			gpGlobals->rgPoisonStatus[iPoisonIndex][index].wPoisonIntensity++;
 			switch (wPoisonLevel)
@@ -459,8 +461,7 @@ VOID CPalBaseIO::PAL_AddPoisonForPlayer(
 	gpGlobals->rgPoisonStatus[i][index].wPoisonID = wPoisonID;
 	gpGlobals->rgPoisonStatus[i][index].wPoisonScript = gpGlobals->g.rgObject[wPoisonID].poison.wPlayerScript;
 
-	//#ifdef POISON_STATUS_EXPAND // 增加毒的烈度
-	if (ggConfig->m_Function_Set[0])
+	if (cfgPoisonUp)
 	{
 #ifdef FINISH_GAME_MORE_ONE_TIME
 		if (wPoisonLevel < 3)
@@ -513,7 +514,7 @@ VOID CPalBaseIO::PAL_CurePoisonByKind(
 		if (gpGlobals->rgPoisonStatus[i][index].wPoisonID == wPoisonID)
 		{
 
-			if (ggConfig->m_Function_Set[0])//#ifdef POISON_STATUS_EXPAND
+			if (cfgPoisonUp)//#ifdef cfgPoisonUp
 				memset(&gpGlobals->rgPoisonStatus[i][index], 0, sizeof(gpGlobals->rgPoisonStatus[i][index]));
 
 			else //#else
@@ -564,7 +565,7 @@ VOID CPalBaseIO::PAL_CurePoisonByLevel(
 		}
 		if (gpGlobals->g.rgObject[w].poison.wPoisonLevel <= wMaxLevel)
 		{
-			if (ggConfig->m_Function_Set[0])//#ifdef POISON_STATUS_EXPAND
+			if (cfgPoisonUp)//#ifdef cfgPoisonUp
 				memset(&gpGlobals->rgPoisonStatus[i][index], 0, sizeof(gpGlobals->rgPoisonStatus[i][index]));
 			else {//#else
 				gpGlobals->rgPoisonStatus[i][index].wPoisonID = 0;
@@ -654,10 +655,10 @@ BOOL CPalBaseIO::PAL_IsPlayerPoisonedByLevel(
 	return FALSE;
 }
 
-INT CPalBaseIO::PAL_New_GetPoisonIndexForPlayer(
+const INT CPalBaseIO::PAL_New_GetPoisonIndexForPlayer(
 	WORD			wPlayerRole,
 	WORD			wPoisonID
-)
+)const
 /*++
   Purpose:    Check if the player is poisoned by the specified poison.
 
@@ -686,9 +687,9 @@ INT CPalBaseIO::PAL_New_GetPoisonIndexForPlayer(
 	return -1;
 }
 
-BOOL CPalBaseIO::PAL_New_IsPlayerPoisoned(
+const BOOL CPalBaseIO::PAL_New_IsPlayerPoisoned(
 	WORD			wPlayerRole
-)
+)const
 /*++
   Purpose:    Check if the player is poisoned.
   Parameters:    [IN]  wPlayerRole - the player role ID.
@@ -718,40 +719,37 @@ VOID CPalBaseIO::PAL_New_SortPoisonsForPlayerByLevel(
 	WORD			wPlayerRole
 )
 {
-	int         i, j, index, PoisonNum;
-	WORD        wPoisonID1, wPoisonID2;
-	WORD        wPoisonLevel1, wPoisonLevel2;
-	POISONSTATUS	tempPoison;
-
-	for (index = 0; index <= gpGlobals->wMaxPartyMemberIndex; index++)
+	int index{};
+	for ( index = 0; index <= gpGlobals->wMaxPartyMemberIndex; )
 	{
 		if (gpGlobals->rgParty[index].wPlayerRole == wPlayerRole)break;
+		index++;
+		if (index > gpGlobals->wMaxPartyMemberIndex)return; // don't go further
 	}
 
-	if (index > gpGlobals->wMaxPartyMemberIndex)return; // don't go further
-
-	for (j = 0, PoisonNum = 0; j < MAX_POISONS; j++)
+	int PoisonNum{};
+	for (int j = 0; j < MAX_POISONS; j++)
 	{
-		wPoisonID1 = gpGlobals->rgPoisonStatus[j][index].wPoisonID;
+		auto wPoisonID1 = gpGlobals->rgPoisonStatus[j][index].wPoisonID;
 		if (wPoisonID1 == 0) gpGlobals->rgPoisonStatus[j][index].wPoisonScript = 0;
 		else PoisonNum++;
 	}
-
 	if (PoisonNum < 2)	return;	//中毒数目小于2不用排序
 
 
-	for (i = 0; i < MAX_POISONS - 1; i++)
+
+	for (int i = 0; i < MAX_POISONS - 1; i++)
 	{
-		for (j = 0; j < MAX_POISONS - i - 1; j++)
+		for (int j = 0; j < MAX_POISONS - i - 1; j++)
 		{
-			wPoisonID1 = gpGlobals->rgPoisonStatus[j][index].wPoisonID;
-			wPoisonLevel1 = gpGlobals->g.rgObject[wPoisonID1].poison.wPoisonLevel;
-			wPoisonID2 = gpGlobals->rgPoisonStatus[j + 1][index].wPoisonID;
-			wPoisonLevel2 = gpGlobals->g.rgObject[wPoisonID2].poison.wPoisonLevel;
+			auto wPoisonID1 = gpGlobals->rgPoisonStatus[j][index].wPoisonID;
+			auto wPoisonLevel1 = gpGlobals->g.rgObject[wPoisonID1].poison.wPoisonLevel;
+			auto wPoisonID2 = gpGlobals->rgPoisonStatus[j + 1][index].wPoisonID;
+			auto wPoisonLevel2 = gpGlobals->g.rgObject[wPoisonID2].poison.wPoisonLevel;
 
 			if (wPoisonLevel1 < wPoisonLevel2)
 			{
-				tempPoison = gpGlobals->rgPoisonStatus[j][index];
+				auto tempPoison = gpGlobals->rgPoisonStatus[j][index];
 				gpGlobals->rgPoisonStatus[j][index] = gpGlobals->rgPoisonStatus[j + 1][index];
 				gpGlobals->rgPoisonStatus[j + 1][index] = tempPoison;
 			}
@@ -760,9 +758,9 @@ VOID CPalBaseIO::PAL_New_SortPoisonsForPlayerByLevel(
 }
 
 
-WORD CPalBaseIO::PAL_GetPlayerAttackStrength(
+const WORD CPalBaseIO::PAL_GetPlayerAttackStrength(
 	WORD			wPlayerRole
-)
+)const
 /*++
   Purpose:
 
@@ -791,9 +789,7 @@ WORD CPalBaseIO::PAL_GetPlayerAttackStrength(
 	return w;
 }
 
-WORD CPalBaseIO::PAL_GetPlayerMagicStrength(
-	WORD			wPlayerRole
-)
+const WORD CPalBaseIO::PAL_GetPlayerMagicStrength(WORD	wPlayerRole)const
 /*++
   Purpose:
 
@@ -822,9 +818,7 @@ WORD CPalBaseIO::PAL_GetPlayerMagicStrength(
 	return w;
 }
 
-WORD CPalBaseIO::PAL_GetPlayerDefense(
-	WORD			wPlayerRole
-)
+const WORD CPalBaseIO::PAL_GetPlayerDefense(WORD	wPlayerRole)const
 /*++
   Purpose:
 
@@ -853,9 +847,7 @@ WORD CPalBaseIO::PAL_GetPlayerDefense(
 	return w;
 }
 
-WORD CPalBaseIO::PAL_GetPlayerDexterity(
-	WORD           wPlayerRole
-)
+const WORD CPalBaseIO::PAL_GetPlayerDexterity(WORD  wPlayerRole)const 
 /*++
   Purpose:
 
@@ -871,16 +863,9 @@ WORD CPalBaseIO::PAL_GetPlayerDexterity(
 
   --*/
 {
-	WORD       w;
-	int        i;
+	auto w = gpGlobals->g.PlayerRoles.rgwDexterity[wPlayerRole];
 
-	w = gpGlobals->g.PlayerRoles.rgwDexterity[wPlayerRole];
-
-#ifdef PAL_CLASSIC
-	for (i = 0; i <= MAX_PLAYER_EQUIPMENTS; i++)
-#else
-	for (i = 0; i <= MAX_PLAYER_EQUIPMENTS - 1; i++)
-#endif
+	for (int i = 0; i <= MAX_PLAYER_EQUIPMENTS; i++)
 	{
 		w += gpGlobals->rgEquipmentEffect[i].rgwDexterity[wPlayerRole];
 	}
@@ -888,9 +873,7 @@ WORD CPalBaseIO::PAL_GetPlayerDexterity(
 	return w;
 }
 
-WORD CPalBaseIO::PAL_GetPlayerFleeRate(
-	WORD           wPlayerRole
-)
+const WORD CPalBaseIO::PAL_GetPlayerFleeRate(WORD   wPlayerRole)const
 /*++
   Purpose:
 
@@ -919,9 +902,7 @@ WORD CPalBaseIO::PAL_GetPlayerFleeRate(
 	return w;
 }
 
-WORD CPalBaseIO::PAL_GetPlayerPoisonResistance(
-	WORD           wPlayerRole
-)
+const WORD CPalBaseIO::PAL_GetPlayerPoisonResistance(WORD  wPlayerRole)const
 /*++
   Purpose:
 
@@ -950,9 +931,7 @@ WORD CPalBaseIO::PAL_GetPlayerPoisonResistance(
     return std::min((int)w, 100);
 }
 
-WORD CPalBaseIO::PAL_New_GetPlayerSorceryResistance(
-	WORD			wPlayerRole
-)
+const WORD CPalBaseIO::PAL_New_GetPlayerSorceryResistance(WORD	wPlayerRole)const
 /*++
 	Purpose:Get the player's resistance to Sorcery, count in the effect of equipments.
 	Parameters:[IN]  wPlayerRole - the player role ID.
@@ -972,9 +951,7 @@ WORD CPalBaseIO::PAL_New_GetPlayerSorceryResistance(
     return std::min(100, (int)w);
 }
 
-WORD CPalBaseIO::PAL_New_GetPlayerSorceryStrength(
-	WORD			wPlayerRole
-)
+const WORD CPalBaseIO::PAL_New_GetPlayerSorceryStrength(WORD wPlayerRole)const
 /*++
 Purpose:Get the player's resistance to Sorcery, count in the effect of equipments.
 Parameters:[IN]  wPlayerRole - the player role ID.
@@ -994,10 +971,10 @@ Return value:The total resistance to Sorcery of the player.
     return std::min(100, (int)w);
 }
 
-WORD CPalBaseIO::PAL_GetPlayerElementalResistance(
+const WORD CPalBaseIO::PAL_GetPlayerElementalResistance(
 	WORD			wPlayerRole,
 	INT				iAttrib
-)
+)const
 /*++
   Purpose:
 
@@ -1029,9 +1006,9 @@ WORD CPalBaseIO::PAL_GetPlayerElementalResistance(
     return std::min((int)w, 100);
 }
 
-WORD CPalBaseIO::PAL_New_GetPlayerPhysicalResistance(
+const WORD CPalBaseIO::PAL_New_GetPlayerPhysicalResistance(
 	WORD			wPlayerRole
-)
+)const
 {
 	WORD       w;
 	int        i;
@@ -1046,9 +1023,9 @@ WORD CPalBaseIO::PAL_New_GetPlayerPhysicalResistance(
     return std::min(100,(int) w);
 }
 
-WORD CPalBaseIO::PAL_GetPlayerBattleSprite(
+const WORD CPalBaseIO::PAL_GetPlayerBattleSprite(
 	WORD             wPlayerRole
-)
+)const
 /*++
   Purpose:
 
@@ -1080,9 +1057,9 @@ WORD CPalBaseIO::PAL_GetPlayerBattleSprite(
 	return w;
 }
 
-WORD CPalBaseIO::PAL_GetPlayerCooperativeMagic(
+const WORD CPalBaseIO::PAL_GetPlayerCooperativeMagic(
 	WORD             wPlayerRole
-)
+)const
 /*++
   Purpose:
 
@@ -1260,38 +1237,13 @@ VOID CPalBaseIO::PAL_SetPlayerStatus(
 
   --*/
 {
-#ifndef PAL_CLASSIC
-	if (wStatusID == kStatusSlow &&
-		gpGlobals->rgPlayerStatus[wPlayerRole][kStatusHaste] > 0)
-	{
-		//
-		// Remove the haste status
-		//
-		PAL_RemovePlayerStatus(wPlayerRole, kStatusHaste);
-		return;
-	}
-
-	if (wStatusID == kStatusHaste &&
-		gpGlobals->rgPlayerStatus[wPlayerRole][kStatusSlow] > 0)
-	{
-		//
-		// Remove the slow status
-		//
-		PAL_RemovePlayerStatus(wPlayerRole, kStatusSlow);
-		return;
-	}
-#endif
 
 	switch (wStatusID)
 	{
 	case kStatusConfused:
 	case kStatusSleep:
 	case kStatusSilence:
-#ifdef PAL_CLASSIC
 	case kStatusParalyzed:
-#else
-	case kStatusSlow:
-#endif
 		//
 		// for "bad" statuses, don't set the status when we already have it
 		//
@@ -1403,9 +1355,9 @@ VOID CPalBaseIO::PAL_ClearAllPlayerStatus(
 }
 
 
-INT CPalBaseIO::PAL_New_GetPlayerIndex(
+const INT CPalBaseIO::PAL_New_GetPlayerIndex(
 	WORD		wPlayerRole
-)
+)const
 {
 	int		i;
 
@@ -1429,9 +1381,7 @@ INT CPalBaseIO::PAL_New_GetPlayerIndex(
 
 }
 
-WORD CPalBaseIO::PAL_New_GetPlayerID(
-	WORD		wPlayerIndex
-)
+const WORD CPalBaseIO::PAL_New_GetPlayerID(WORD  wPlayerIndex)const
 {
 	if (wPlayerIndex > MAX_PLAYERS_IN_PARTY)
 	{
@@ -1444,9 +1394,9 @@ WORD CPalBaseIO::PAL_New_GetPlayerID(
 }
 
 //fGetLowest为真找属性最低的角色序号，bLow为假找属性最高的角色序号，
-INT CPalBaseIO::PAL_New_GetPlayerIndexByPara(
+const INT CPalBaseIO::PAL_New_GetPlayerIndexByPara(
 	PlayerPara	pp,
-	BOOL		fGetLowest)
+	BOOL		fGetLowest)const
 {
 	WORD* p = (WORD*)(&gpGlobals->g.PlayerRoles);
 	WORD* p1[MAX_PLAYER_EQUIPMENTS + 1] =
@@ -1504,9 +1454,7 @@ INT CPalBaseIO::PAL_New_GetPlayerIndexByPara(
 	}
 }
 
-INT CPalBaseIO::PAL_New_GetPlayerIndexByHealth(
-	BOOL		fGetLowest
-)
+const INT CPalBaseIO::PAL_New_GetPlayerIndexByHealth(BOOL fGetLowest)const
 /*++
 功能：    选中生命值最低（高）的角色.
 参数：    fLow为真是选择最低，反之选择最高.
@@ -1568,7 +1516,7 @@ INT CPalBaseIO::PAL_New_GetPlayerIndexByHealth(
 
 BOOL CPalBaseIO::PAL_New_GetTrueByPercentage(
 	WORD		wPercentage
-)
+)const
 /*++
 Purpose:根据百分比返回真值
 
@@ -1589,7 +1537,7 @@ Return value:有（输入%）的可能返回真值，其余返回假
 
 DWORD CPalBaseIO::PAL_New_GetLevelUpBaseExp(
 	WORD		wLevel
-)
+)const
 {
 	DWORD wExp = 0;
 /*
@@ -1608,7 +1556,7 @@ DWORD CPalBaseIO::PAL_New_GetLevelUpBaseExp(
 
 DWORD CPalBaseIO::PAL_New_GetLevelUpExp(
 	WORD		wLevel
-)
+)const
 {
 #if 0
 	//WORD wTimes = wLevel / 100;
@@ -1620,15 +1568,35 @@ DWORD CPalBaseIO::PAL_New_GetLevelUpExp(
     return std::min((int)dwExp, 9999999);
 }
 
+INT CPalBaseIO::PAL_GetHidingTime() const
+{
+	int ret{};
+	for (int i = 0; i <= gpGlobals->wMaxPartyMemberIndex; i++)
+	{
+		ret = std::max((int)g_Battle.rgPlayer[i].wHidingTime, ret);
+	}
+	return ret;
+}
 
-BOOL CPalBaseIO::PAL_New_IfPlayerCanMove(WORD wPlayerRole)
+VOID CPalBaseIO::PAL_SetHidingTime(int hide)
+{
+	for (int i = 0; i <= gpGlobals->wMaxPartyMemberIndex; i++)
+	{
+		g_Battle.rgPlayer[i].wHidingTime = hide;
+	}
+}
+
+VOID CPalBaseIO::PAL_UpdateHidingTime(int play)
+{
+		if (g_Battle.rgPlayer[play].wHidingTime)
+			g_Battle.rgPlayer[play].wHidingTime--;
+}
+
+
+const BOOL CPalBaseIO::PAL_New_IfPlayerCanMove(WORD wPlayerRole)const
 {
 	if (gpGlobals->rgPlayerStatus[wPlayerRole][kStatusSleep] == 0 &&
-#ifdef PAL_CLASSIC
 		gpGlobals->rgPlayerStatus[wPlayerRole][kStatusParalyzed] == 0 &&
-#else
-		gpGlobals->rgPlayerStatus[wPlayerRole][kStatusSlow] == 0 &&
-#endif
 		gpGlobals->rgPlayerStatus[wPlayerRole][kStatusConfused] == 0)
 	{
 		return TRUE;

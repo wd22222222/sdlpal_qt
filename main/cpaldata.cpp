@@ -1,4 +1,6 @@
-﻿///* -*- mode: c; tab-width: 4; c-basic-offset: 4; c-file-style: "linux" -*- */
+﻿#include "cpaldata.h"
+#include "cpaldata.h"
+///* -*- mode: c; tab-width: 4; c-basic-offset: 4; c-file-style: "linux" -*- */
 //
 // Copyright (c) 2009-2011, Wei Mingzhi <whistler_wmz@users.sf.net>.
 // Copyright (c) 2011-2021, SDLPAL development team.
@@ -170,32 +172,8 @@ ByteArray CPalData::readAll(const std::string& fileName) {
 }
 
 
-
-/*
-ByteArray CPalData::readAll(const std::string& fileName) {
-	FILE* fd = fopen(fileName.c_str(), "rb");
-	if (!fd) {
-		//perror("open失败");
-		return ByteArray();
-	}
-
-	// 获取文件大小
-	fseek(fd, 0, SEEK_END);
-	off_t fileSize = ftell(fd);
-	if (fileSize == (off_t)-1) {
-		perror("lseek失败");
-		fclose(fd);
-		return ByteArray();
-	}
-	fseek(fd, 0, SEEK_SET);  // 回到文件开头
-	ByteArray fileData(fileSize);
-	fread(fileData.data(),fileSize,1,fd);
-	fclose(fd);
-	return fileData;
-}
-
-*/
-CPalData::CPalData(const std::string& dir,const CPalData* pf) {
+CPalData::CPalData(const std::string& dir,const CPalData* pf) 
+{
 	loadAllData(dir, pf);
 }
 
@@ -207,7 +185,6 @@ CPalData::~CPalData() {
 
 PalErr CPalData::loadAllData(const std::string& dir, const CPalData* pf)
 {
-	auto& gConfig = CPalEvent::ggConfig;
 	//复制系统目录
 	PalDir = dir;
 	int err{};
@@ -235,9 +212,9 @@ PalErr CPalData::loadAllData(const std::string& dir, const CPalData* pf)
 			loadData(dir + "desc.dat", f.fpDesc);
 	}
 	err += loadConfig();
-	err = (CConfig::fisUSEYJ1DeCompress = is_Use_YJ1_Decompress()) == -1;
+	err = (cfgIsUSEYJ1DeCompress = is_Use_YJ1_Decompress()) == -1;
 
-	CPalEvent::ggConfig->fIsWIN95 = PAL_IsPalWIN();
+	cfgIsWin95 = PAL_IsPalWIN();
 	PAL_InitGlobalGameData();
 	if (err)
 	{
@@ -245,30 +222,31 @@ PalErr CPalData::loadAllData(const std::string& dir, const CPalData* pf)
 	}
 	g.rgObject.resize( MAX_OBJECTS);
 	DWORD len = PAL_MKFGetChunkSize(2, f.fpSSS);
-	if (gConfig->fIsWIN95)
+	if (cfgIsWin95)
 		g.nObject = len / sizeof(OBJECT);
 	else
 		g.nObject = len / sizeof(OBJECT_DOS);
 	PAL_InitText();
 	PAL_InitUI();
 	PAL_LoadDefaultGame();
-	bIsBig5 = PAL_IsBig5(gConfig->m_Function_Set[49]) == 1;
+	bIsBig5 = PAL_IsBig5(cfgCharSet) == 1;
 	//装入说明，如没有则为空
-	lpObjectDesc = PAL_LoadObjectDesc();
+	rgObjectDesc = PAL_LoadObjectDesc();
 	//存档文件缓存
 	//预装入存档文件
-	int maxSaveFile = gConfig->m_Function_Set[47] + 
-		CPalEvent::ggConfig->m_Function_Set[53];
-	rgSaveData.resize(maxSaveFile);
+	rgSaveData.clear();
+	rgSaveData.resize(SAVEFILES);
+	rgSaveDataChaged.clear();
+	rgSaveDataChaged.resize(SAVEFILES);
 	if (pf)
-		for (int i = 0; i < maxSaveFile; i++)
+		for (int i = 0; i < SAVEFILES; i++)
 			rgSaveData.at(i) = pf->rgSaveData.at(i);
 	else
-		for (size_t i = 0; i < maxSaveFile; i++)
+		for (size_t i = 0; i < SAVEFILES; i++)
 		{
 			std::string fileName = CPalEvent::PalDir +
 				CPalEvent::va("%d.rpg", i + 1 - 
-					CPalEvent::ggConfig->m_Function_Set[53]);
+					cfgAutoSave);
 			if (IsFileExist(fileName))
 			{
 				rgSaveData.at(i) = readAll(fileName);
@@ -406,7 +384,7 @@ PalErr CPalData::PAL_InitText()
 	g_TextLib.bDialogPosition = kDialogUpper;
 	g_TextLib.fUserSkip = FALSE;
 
-	PAL_MKFReadChunk(g_TextLib.bufDialogIcons, 282, 12, f.fpDATA);
+	g_TextLib.bufDialogIcons = PAL_MKFReadChunk(12, f.fpDATA);
 
 	return 0;
 }
@@ -424,30 +402,19 @@ PalErr CPalData::PAL_InitUI()
 		return 1;
 	}
 
-	gpSpriteUI = (LPSPRITE)calloc(1, iSize);
-	if (gpSpriteUI == NULL)
-	{
-		return -1;
-	}
-
-	PAL_MKFReadChunk(gpSpriteUI, iSize, CHUNKNUM_SPRITEUI, f.fpDATA);
+	gpSpriteUI = PAL_MKFReadChunk(CHUNKNUM_SPRITEUI, f.fpDATA);
 
 	return 0;
 }
 
 VOID CPalData::PAL_FreeGlobals()
 {
-	PAL_FreeObjectDesc(lpObjectDesc);
+	PAL_FreeObjectDesc(rgObjectDesc);
 }
 
 VOID CPalData::PAL_FreeUI()
 {
-
-	if (gpSpriteUI != NULL)
-	{
-		free(gpSpriteUI);
-		gpSpriteUI = NULL;
-	}
+	gpSpriteUI.clear();
 }
 
 VOID CPalData::PAL_FreeText()
@@ -455,15 +422,12 @@ VOID CPalData::PAL_FreeText()
 }
 
 //释放说明
-VOID CPalData::PAL_FreeObjectDesc(LPOBJECTDESC lpObjectDesc)
+VOID CPalData::PAL_FreeObjectDesc(OBJECTDESC rgObjectDesc)
 {
-	if (lpObjectDesc == NULL)
-		return;
-	delete (lpObjectDesc);
-	lpObjectDesc = nullptr;
+	rgObjectDesc.clear();
 }
 
-LPOBJECTDESC CPalData::PAL_LoadObjectDesc()
+OBJECTDESC CPalData::PAL_LoadObjectDesc()
 /*++
 Purpose:
 
@@ -483,13 +447,14 @@ Pointer to loaded data, in linked list form. NULL if unable to load.
 	auto& fp = f.fpDesc;
 	if (fp.empty())
 	{
-		return NULL;
+		return OBJECTDESC();
 	}
 
 	//
 	// Load the description data
 
-	auto lpDesc = new OBJECTDESC;
+	OBJECTDESC lpDesc;
+	//lpDesc.resize(MAX_OBJECTS);
 	size_t pos{};
 	char buf[512];
 	while (bgets(buf, 510, fp, pos))
@@ -503,7 +468,7 @@ Pointer to loaded data, in linked list form. NULL if unable to load.
 		p++;
 		int i{};
 		sscanf_s(buf, "%x", &i);
-		lpDesc->p[i] = PAL_TextToUTF8(p);
+		lpDesc[i] = PAL_TextToUTF8(p);
 	}
 
 	return lpDesc;
@@ -522,6 +487,21 @@ BOOL CPalData::IsDirExist(const std::string& path)
     return std::filesystem::exists(path) && 
 		std::filesystem::is_directory(path);
 }
+
+
+// 将内存指针转化为整数
+int CPalData::pByteToInt(LPCBYTE p) {
+		// 运行时检测大小端：如果第一个字节是 1，则为小端
+		const uint16_t endian_test = 1;
+		bool is_little_endian = (*((uint8_t*)&endian_test) == 1);
+
+		if (is_little_endian) {
+			return (int)(p[0] | (p[1] << 8) | (p[2] << 16) | (p[3] << 24));
+		}
+		else {
+			return (int)(p[3] | (p[2] << 8) | (p[1] << 16) | (p[0] << 24));
+		}
+	}
 
 int CPalData::PAL_MKFReadChunk(LPBYTE lpBuffer, UINT uiBufferSize, UINT uiChunkNum, const ByteArray& fp)
 {
@@ -597,7 +577,6 @@ PalErr CPalData::PAL_LoadGame(LPCSTR szFileName)
 
 PalErr CPalData::PAL_LoadGame(const ByteArray & fi)
 {
-	auto &gConfig = CPalEvent::ggConfig;
 	if (fi.empty())
 		return 1;
 	auto s =(const SAVEDGAME_COMMON *)fi.data();
@@ -618,7 +597,7 @@ PalErr CPalData::PAL_LoadGame(const ByteArray & fi)
 	wChasespeedChangeCycles = s->wChasespeedChangeCycles;
 	nFollower = s->nFollower;
 	dwCash = s->dwCash;
-	if (!gConfig->fIsWIN95)
+	if (!cfgIsWin95)
 		bFinishGameTime = s->bFinishGameTime;
 	else
 		bFinishGameTime = 0;
@@ -635,7 +614,7 @@ PalErr CPalData::PAL_LoadGame(const ByteArray & fi)
 	fEnteringScene = FALSE;
 
 	PAL_CompressInventory();
-	if (gConfig->fIsWIN95)
+	if (cfgIsWin95)
 	{
 		auto p = (const SAVEDGAME*)s;
 		memcpy(g.rgObject.data(), p->rgObject, sizeof(p->rgObject));
@@ -662,7 +641,7 @@ VOID CPalData::PAL_SaveGame(int iSlot, WORD wSavedTimes,bool noSave)
 	bSavedTimes = wSavedTimes;
 
 	ByteArray& fb = rgSaveData.at(iSlot - 1);
-	if (iSlot == 1 && CPalEvent::ggConfig->m_Function_Set[53])
+	if (iSlot == 1 && cfgAutoSave)
 		wSavedTimes = 1;
 	PAL_SaveGame(fb, wSavedTimes);
 	rgSaveDataChaged[iSlot - 1] = 1;//标识改变
@@ -685,10 +664,11 @@ VOID CPalData::PAL_SaveGame(int iSlot, WORD wSavedTimes,bool noSave)
 
 	FILE* fp{};
 	std::string szFileName = CPalEvent::PalDir + 
-		CPalEvent::va("%d.rpg", iSlot - CPalEvent::ggConfig->m_Function_Set[53]);
+		CPalEvent::va("%d.rpg", iSlot - cfgAutoSave);
 	if (fopen_s(&fp, szFileName.c_str(), "wb"))
 		return;
 	auto i = getSaveFileLen();
+	
 	fwrite(s, i, 1, fp);
 
 	fclose(fp);
@@ -698,7 +678,7 @@ VOID CPalData::PAL_SaveGame(ByteArray& fp, WORD wSavedTimes)
 {
 	fp.resize(sizeof(SAVEDGAME));
 	auto s = (SAVEDGAME_COMMON*)fp.data();
-	if (CPalEvent::ggConfig->fIsWIN95)
+	if (cfgIsWin95)
 	{
 		SAVEDGAME* p = (SAVEDGAME*)s;
 		memcpy(&p->rgObject, g.rgObject.data(), sizeof(p->rgObject));
@@ -737,17 +717,12 @@ VOID CPalData::PAL_SaveGame(ByteArray& fp, WORD wSavedTimes)
 	s->bFinishGameTime = bFinishGameTime;
 #endif
 
-#ifndef PAL_CLASSIC
-	s->wBattleSpeed = bBattleSpeed;
-#else
 	s->wBattleSpeed = 2;
-#endif
 
 	memcpy(s->rgParty, rgParty, sizeof(rgParty));
 	memcpy(s->rgTrail, rgTrail, sizeof(rgTrail));
 	s->Exp = Exp;
 	s->PlayerRoles = g.PlayerRoles;
-	//memcpy(s->rgPoisonStatus, rgPoisonStatus, sizeof(rgPoisonStatus));
 	memcpy(s->rgInventory, rgInventory, sizeof(rgInventory));
 	memcpy(s->rgScene, g.rgScene.data(), sizeof(s->rgScene));
 }
@@ -769,7 +744,7 @@ None.
 	Pal_LoadObject(g.lprgEventObject, g.nEventObject,0,f.fpSSS);
 	Pal_LoadObject(g.rgScene, g.nScene,1,f.fpSSS);
 	assert( g.nScene <= MAX_SCENES);
-	if (CPalEvent::ggConfig->fIsWIN95)
+	if (cfgIsWin95)
 	{
 		PAL_MKFReadChunk((LPBYTE)(g.rgObject.data()), sizeof(OBJECT) * MAX_OBJECTS, 2, f.fpSSS);
 	}
@@ -854,20 +829,19 @@ void CPalData::trim(char* str)
 */
 std::string CPalData::PAL_TextToUTF8(const std::string& s)
 {
-	auto& gConfig = CPalEvent::ggConfig;
 	if (s.empty()) return std::string();
 
 	Cls_Iconv m{};
 	std::string rs;
-	if (bIsBig5 && !gConfig->fIsUseBig5)
+	if (bIsBig5 && !cfgUseBig5)
 	{
 		rs = m.GBKtoUTF8(m.Big5ToGb2312(s));
 	}
-	else if (bIsBig5 && gConfig->fIsUseBig5)
+	else if (bIsBig5 && cfgUseBig5)
 	{
 		rs = m.BIG5toUTF8(s);
 	}
-	else if (!bIsBig5 && gConfig->fIsUseBig5)
+	else if (!bIsBig5 && cfgUseBig5)
 	{
 		rs = m.BIG5toUTF8(m.Gb2312ToBig5(s));
 	}
@@ -953,27 +927,19 @@ std::string CPalData::PAL_GetWord(WORD wNumWord)
 
 PalErr CPalData::loadConfig()
 {
-	//auto& gConfig = CPalEvent::ggConfig;
-	if (!gConfig)
-		gConfig = new CConfig;
-	CPalEvent::ggConfig = gConfig;
+
 	if (PAL_MKFGetChunkCount(f.fpDATA) < 16)
 		return 0;//没有存入数据
-	if (!gConfig)//出错
-		return 1;
-	int len = PAL_MKFGetChunkSize(15, f.fpDATA);
-	BYTE buf[2048]{ 0 };
-	PAL_MKFReadChunk(buf, len, 15, f.fpDATA);
-	memcpy(gConfig->m_Function_Set, buf, sizeof(gConfig->m_Function_Set));
 
-	RangeValues(gConfig->m_Function_Set[45], 0, 4);
-	RangeValues(gConfig->m_Function_Set[46], 0, 1);
-	RangeValues(gConfig->m_Function_Set[47], 5, 30);
-	RangeValues(gConfig->m_Function_Set[48], -80, 500);//加速
+	auto buf =  PAL_MKFReadChunk(15, f.fpDATA);
+	memcpy(CConfig::m_Function_Set, buf.data(), sizeof(CConfig::m_Function_Set));
+
+	CConfig::setConfigValues();
+
 	//装入字库目录
-	if (len > sizeof(gConfig->m_Function_Set))
+	if (buf.size() > sizeof(CConfig::m_Function_Set))
 	{
-		CPalEvent::ggConfig->m_FontName = (LPCSTR)( buf + sizeof(gConfig->m_Function_Set));
+		CConfig::m_FontName = (LPCSTR)&( buf.at(sizeof(CConfig::m_Function_Set)));
 	}
 	return 0;
 }
@@ -1077,7 +1043,7 @@ VOID CPalData::PAL_New_GoBackAndLoadDefaultGame()
 Purpose:穿越回去，除了主角的各项属性，其余的都恢复到最初的数据
 --*/
 {
-	SGAMEDATA* p = &g;
+	//SGAMEDATA* p = &g;
 	UINT32             i;
 	PLAYERROLES playerRoles;
 
@@ -1085,14 +1051,14 @@ Purpose:穿越回去，除了主角的各项属性，其余的都恢复到最初
 	//
 	// Load the default data from the game data files.
 	//
-	Pal_LoadObject(p->lprgEventObject,p->nEventObject,0, f.fpSSS);
+	Pal_LoadObject(g.lprgEventObject,g.nEventObject,0, f.fpSSS);
 
-	Pal_LoadObject(p->rgScene, p->nScene,1,f.fpSSS);
+	Pal_LoadObject(g.rgScene, g.nScene,1,f.fpSSS);
 
-	if (CPalEvent::ggConfig->fIsWIN95)
+	if (cfgIsWin95)
 	{
-		PAL_MKFReadChunk((LPBYTE)(p->rgObject.data()), sizeof(OBJECT), 2, f.fpSSS);
-		DO_BYTESWAP(p->rgObject.data(), sizeof(OBJECT));
+		PAL_MKFReadChunk((LPBYTE)(g.rgObject.data()), sizeof(OBJECT), 2, f.fpSSS);
+		DO_BYTESWAP(g.rgObject.data(), sizeof(OBJECT));
 	}
 	else
 	{
@@ -1104,9 +1070,9 @@ Purpose:穿越回去，除了主角的各项属性，其余的都恢复到最初
 		//转化格式
 		for (i = 0; i < MAX_OBJECTS; i++)
 		{
-			memcpy(&p->rgObject[i], &objects[i], sizeof(OBJECT_DOS));
-			p->rgObject[i].rgwData[6] = objects[i].rgwData[5];     // wFlags
-			p->rgObject[i].rgwData[5] = 0;                         // wScriptDesc or wReserved2
+			memcpy(&g.rgObject[i], &objects[i], sizeof(OBJECT_DOS));
+			g.rgObject[i].rgwData[6] = objects[i].rgwData[5];     // wFlags
+			g.rgObject[i].rgwData[5] = 0;                         // wScriptDesc or wReserved2
 		}
 	}
 
@@ -1123,10 +1089,6 @@ Purpose:穿越回去，除了主角的各项属性，其余的都恢复到最初
 	wLayer = 0;
 	wChaseRange = 1;
 
-#ifndef PAL_CLASSIC
-	bBattleSpeed = 2;
-#endif
-
 	bFinishGameTime++;
 
 	memset(rgPoisonStatus, 0, sizeof(rgPoisonStatus));
@@ -1136,14 +1098,14 @@ Purpose:穿越回去，除了主角的各项属性，其余的都恢复到最初
 
 	for (i = 0; i < MAX_PLAYER_ROLES; i++)
 	{
-		Exp.rgPrimaryExp[i].wLevel = p->PlayerRoles.rgwLevel[i];
-		Exp.rgHealthExp[i].wLevel = p->PlayerRoles.rgwLevel[i];
-		Exp.rgMagicExp[i].wLevel = p->PlayerRoles.rgwLevel[i];
-		Exp.rgAttackExp[i].wLevel = p->PlayerRoles.rgwLevel[i];
-		Exp.rgMagicPowerExp[i].wLevel = p->PlayerRoles.rgwLevel[i];
-		Exp.rgDefenseExp[i].wLevel = p->PlayerRoles.rgwLevel[i];
-		Exp.rgDexterityExp[i].wLevel = p->PlayerRoles.rgwLevel[i];
-		Exp.rgFleeExp[i].wLevel = p->PlayerRoles.rgwLevel[i];
+		Exp.rgPrimaryExp[i].wLevel = g.PlayerRoles.rgwLevel[i];
+		Exp.rgHealthExp[i].wLevel = g.PlayerRoles.rgwLevel[i];
+		Exp.rgMagicExp[i].wLevel = g.PlayerRoles.rgwLevel[i];
+		Exp.rgAttackExp[i].wLevel = g.PlayerRoles.rgwLevel[i];
+		Exp.rgMagicPowerExp[i].wLevel = g.PlayerRoles.rgwLevel[i];
+		Exp.rgDefenseExp[i].wLevel = g.PlayerRoles.rgwLevel[i];
+		Exp.rgDexterityExp[i].wLevel = g.PlayerRoles.rgwLevel[i];
+		Exp.rgFleeExp[i].wLevel = g.PlayerRoles.rgwLevel[i];
 	}
 
 #ifdef FINISH_GAME_MORE_ONE_TIME
@@ -1344,7 +1306,7 @@ VOID CPalData::PAL_New_SortInventory()
 const size_t CPalData::getSaveFileLen()const
 {
 
-	if (CPalEvent::ggConfig->fIsWIN95)
+	if (cfgIsWin95)
 		return sizeof(SAVEDGAME) + g.nEventObject * sizeof(EVENTOBJECT) -
 			sizeof(EVENTOBJECT) * MAX_EVENT_OBJECTS;
 	else
@@ -1356,14 +1318,14 @@ const size_t CPalData::getSaveFileLen()const
 //取对象结构在存储文件中的位移 0 对象，2 场景 1 场景对象
 const size_t CPalData::getSaveFileOffset(int ob)const
 {
-	return tagSAVEDGAME_DOS::getOffset(ob, CPalEvent::ggConfig->fIsWIN95);
+	return tagSAVEDGAME_DOS::getOffset(ob, cfgIsWin95);
 }
 
 //从存档文件缓存中返回指定结构指定位置的指针
 //ob = 1 OBJECT,ob = 2 scene ob = 3 EventObject
 // row 为 行 col 为栏 fp 存档数据
 LPWORD CPalData::getSaveFileObject(int ob,int row,int col, ByteArray& fp) {
-	if (CPalEvent::ggConfig->fIsWIN95)
+	if (cfgIsWin95)
 	{
 		auto s = (SAVEDGAME*)(fp.data());
 		switch (ob)
@@ -1375,7 +1337,7 @@ LPWORD CPalData::getSaveFileObject(int ob,int row,int col, ByteArray& fp) {
 			return &((LPWORD)(&s->rgScene[row]))[col];
 			break;
 		case 3:
-			return &((LPWORD)((LPOBJECTDESC)&s->rgEventObject[row]))[col];
+			return &((LPWORD)(&s->rgEventObject[row]))[col];
 			break;
 		default:
 			return nullptr;
@@ -1393,7 +1355,7 @@ LPWORD CPalData::getSaveFileObject(int ob,int row,int col, ByteArray& fp) {
 			return &((LPWORD)(&s->rgScene[row]))[col];
 			break;
 		case 3:
-			return &((LPWORD)((LPOBJECTDESC)&s->rgEventObject[row]))[col];
+			return &((LPWORD)(&s->rgEventObject[row]))[col];
 			break;
 		default:
 			return nullptr;

@@ -5,12 +5,11 @@
 #include <stdio.h>
 #include <string>
 #include "command.h"
+//#include <vector>
+#include <map>
 //#include "palgpgl.h"
 
-#define VOID void 
-#define FALSE 0
-#define TRUE  1
-#define CP_UTF8                   65001       // UTF-8 translation
+#define VOID void
 
 typedef char                CHAR;
 typedef short               SHORT;
@@ -230,10 +229,10 @@ typedef struct tagOBJECT_ITEM
 
 typedef enum tagMAGICFLAG
 {
-	kMagicFlagUsableOutsideBattle = (1 << 0),
-	kMagicFlagUsableInBattle = (1 << 1),
-	kMagicFlagUsableToEnemy = (1 << 3),
-	kMagicFlagApplyToAll = (1 << 4),
+	kMagicFlagUsableOutsideBattle = (1 << 0),//不能在战斗中使用
+	kMagicFlagUsableInBattle = (1 << 1),//只能在战斗中使用
+	kMagicFlagUsableToEnemy = (1 << 3),//对敌方使用
+	kMagicFlagApplyToAll = (1 << 4),//全体
 } MAGICFLAG;
 
 // magics
@@ -353,14 +352,14 @@ typedef struct tagENEMY
 	WORD        wAttackStrength;     // normal attack strength
 	WORD        wMagicStrength;      // magical attack strength
 	WORD        wDefense;            // resistance to all kinds of attacking
-	WORD        wDexterity;          // dexterity
+	WORD        weDexterity;          // dexterity
 	WORD        wFleeRate;           // chance for successful fleeing
 	WORD        wPoisonResistance;   // resistance to poison
 	WORD        wElemResistance[NUM_MAGIC_ELEMENTAL]; // resistance to elemental magics
 	WORD        wPhysicalResistance; // resistance to physical attack
 	WORD        wDualMove;           // whether this enemy can do dual move or not
 	WORD        wCollectValue;       // value for collecting this enemy for items
-} ENEMY, *LPENEMY;
+} ENEMY;
 
 typedef struct tagENEMYTEAM
 {
@@ -428,7 +427,7 @@ typedef struct tagMAGIC
 	WORD               wYOffset;
 	WORD               wSummonEffect;         // summon effect sprite (in F.MKF)
 	WORD               wSpeed;                // speed of the effect
-	WORD               wKeepEffect;           // FIXME: ???
+	WORD               wKeepEffect;           // keep of the effect 0xffff keeps the effect until the end of battle, otherwise, keeps the effect for this many frames
 	WORD               wSoundDelay;           // delay of the SFX
 	WORD               wEffectTimes;          // total times of effect
 	WORD               wShake;                // shake screen
@@ -496,7 +495,7 @@ typedef struct tagEXPERIENCE
 #endif
 	WORD         wLevel;              // current level
 	WORD         wCount;
-} EXPERIENCE, *LPEXPERIENCE;
+} EXPERIENCE;
 
 typedef struct tagALLEXPERIENCE
 {
@@ -508,7 +507,7 @@ typedef struct tagALLEXPERIENCE
 	EXPERIENCE        rgDefenseExp[MAX_PLAYER_ROLES];
 	EXPERIENCE        rgDexterityExp[MAX_PLAYER_ROLES];
 	EXPERIENCE        rgFleeExp[MAX_PLAYER_ROLES];
-} ALLEXPERIENCE, *LPALLEXPERIENCE;
+} ALLEXPERIENCE;
 
 typedef enum tagExpType
 {
@@ -527,15 +526,17 @@ typedef struct tagPOISONSTATUS
 {
 	WORD			wPoisonID{ 0 };       // kind of the poison
 	WORD			wPoisonScript{ 0 };   // script entry
-//#ifdef POISON_STATUS_EXPAND
 	WORD			wPoisonIntensity{ 0 }; // 毒的烈度
-//#endif
 } POISONSTATUS, *LPPOISONSTATUS;
 
-typedef struct tagOBJECTDESC
+/*typedef struct tagOBJECTDESC
 {
 	std::string p[MAX_OBJECTS];
 } OBJECTDESC, *LPOBJECTDESC;
+*/
+
+
+using OBJECTDESC = std::map<int ,std::string>;
 
 void TerminateOnError(const char *fmt,
     ...
@@ -569,7 +570,7 @@ typedef struct TEXTLIB
 	BOOL            fUserSkip;
 	BOOL            fPlayingRNG;
 
-	BYTE            bufDialogIcons[282];
+	ByteArray       bufDialogIcons;
 } TEXTLIB, * LPTEXTLIB;
 
 #endif
